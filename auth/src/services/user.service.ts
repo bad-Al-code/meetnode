@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 
 import logger from '@/config/logger';
 import { db } from '@/db';
@@ -13,30 +13,36 @@ type CreateUserInput = Omit<
 
 type CreateUserOutput = Omit<SelectUser, 'hashedPassword'>;
 
-export async function createUser(
-  userData: CreateUserInput
-): Promise<CreateUserOutput> {
-  const { email, username, password, acceptedTerms } = userData;
-
+async function checkExistingUser(
+  email: string,
+  username?: string | null
+): Promise<void> {
   try {
-    const exitingUser = await db.query.users.findFirst({
-      where: username
-        ? eq(users.email, email) || eq(users.username, username)
-        : eq(users.email, email),
+    const whereCondition = username
+      ? or(eq(users.email, email), eq(users.username, username))
+      : eq(users.email, email);
+
+    const existingUser = await db.query.users.findFirst({
+      where: whereCondition,
       columns: { email: true, username: true },
     });
 
-    if (exitingUser) {
-      if (exitingUser.email === email) {
-        logger.warn(`Signup attempt failed: Email ${email} already exists.`);
-        throw new ConflictError('An acount with this email already exists.');
+    if (existingUser) {
+      let conflictField = '';
+      if (existingUser.email === email) {
+        conflictField = 'email';
+      } else if (username && existingUser.username === username) {
+        conflictField = 'username';
       }
 
-      if (username && exitingUser.username === username) {
+      if (conflictField) {
+        const message = `An account with this ${conflictField} already exists.`;
         logger.warn(
-          `Signup attempt failed: Username ${username} already exists.`
+          `User creation conflict for ${email}: ${conflictField} '${
+            conflictField === 'email' ? email : username
+          }' already exists.`
         );
-        throw new ConflictError('An acount with this username already exists.');
+        throw new ConflictError(message);
       }
     }
   } catch (error) {
@@ -48,35 +54,34 @@ export async function createUser(
       { err: error },
       `Database error checking user existence for email: ${email}`
     );
-
     throw new InternalServerError(
-      'Failed to check user existence. Please try again later.'
+      'Failed to check user details due to a server issue. Please try again later.'
     );
   }
+}
 
-  let hashedPassword: string;
+async function getHashedPassword(
+  password: string,
+  email: string
+): Promise<string> {
   try {
-    hashedPassword = await hashPassword(password);
+    return await hashPassword(password);
   } catch (error) {
-    logger.error({ err: Error }, `Failed to hash password for users: ${email}`);
-
+    logger.error({ err: error }, `Failed to hash password for user: ${email}`);
     throw new InternalServerError(
-      'Failed to process registration securely. Please try again later.'
+      'Failed to securely process registration. Please try again later.'
     );
   }
+}
 
-  const newUser: InsertUser = {
-    email,
-    username: username || null,
-    hashedPassword,
-    acceptedTerms,
-  };
-
+async function insertNewUser(
+  newUserInput: InsertUser
+): Promise<CreateUserOutput> {
   try {
-    const insertResult = await db.insert(users).values(newUser);
+    const insertResult = await db.insert(users).values(newUserInput);
 
     const createdUser = await db.query.users.findFirst({
-      where: eq(users.email, email),
+      where: eq(users.email, newUserInput.email),
       columns: {
         id: true,
         email: true,
@@ -90,7 +95,7 @@ export async function createUser(
 
     if (!createdUser) {
       logger.error(
-        `Failed to fetch user record immediately after insertion for email: ${email}`
+        `Failed to fetch user record immediately after insertion for email: ${newUserInput.email}`
       );
 
       throw new InternalServerError(
@@ -100,18 +105,47 @@ export async function createUser(
 
     return createdUser;
   } catch (error: any) {
-    if (error?.code === 'ER_DUP_ENTRY') {
+    if (error.code === '23505' || error.code === 'ER_DUP_ENTRY') {
       logger.warn(
-        `Database duplicate entry conflict during insert for email: ${email} (Possible race condition)`
+        {
+          err: { code: error.code, message: error.message },
+          email: newUserInput.email,
+          username: newUserInput.username,
+        },
+        `Database unique constraint violation during user creation.`
       );
       throw new ConflictError(
-        'This email or username is already registered (conflict during save).'
+        'This email or username is already registered (conflict detected during save).'
       );
     }
 
-    logger.error({ err: error }, `Database error inserting user: ${email}`);
+    logger.error(
+      { err: error },
+      `Database error inserting user: ${newUserInput.email}`
+    );
     throw new InternalServerError(
       'Failed to save user registration due to a database error.'
     );
   }
+}
+
+export async function createUser(
+  userData: CreateUserInput
+): Promise<CreateUserOutput> {
+  const { email, username, password, acceptedTerms } = userData;
+
+  await checkExistingUser(email, username);
+
+  const hashedPassword = await getHashedPassword(password, email);
+
+  const newUser: InsertUser = {
+    email,
+    username: username || null,
+    hashedPassword,
+    acceptedTerms,
+  };
+
+  const createdUser = await insertNewUser(newUser);
+
+  return createdUser;
 }
