@@ -8,12 +8,24 @@ import express, {
 } from 'express';
 import { pinoHttp } from 'pino-http';
 import { StatusCodes } from 'http-status-codes';
+import { RedisStore } from 'connect-redis';
 
 import logger from './config/logger';
 import { NotFoundError } from './utils/errors';
 import { errorHandler } from './middleware/errorHandler.middleware';
+import redisClient from './config/redis';
+import session from 'express-session';
+import { env } from './config/env';
+
+const redisStore = new RedisStore({
+  client: redisClient,
+  prefix: 'auth_sess',
+  disableTouch: true,
+});
 
 const app: Express = express();
+
+app.set('trust proxy', 1);
 
 app.use(
   pinoHttp({
@@ -49,6 +61,22 @@ app.use(
 
 app.use(json());
 app.use(urlencoded({ extended: true }));
+
+app.use(
+  session({
+    store: redisStore,
+    secret: env.SESSION_SECRET,
+    name: env.SESSION_NAME,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: env.NODE_ENV === 'prod',
+      httpOnly: true,
+      maxAge: env.SESSION_MAX_AGE_MS,
+      sameSite: 'lax',
+    },
+  })
+);
 
 app.get('/health', (req: Request, res: Response) => {
   res

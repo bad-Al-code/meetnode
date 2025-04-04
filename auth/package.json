@@ -19,17 +19,21 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "connect-redis": "^8.0.2",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.41.0",
     "express": "^5.1.0",
+    "express-session": "^1.18.1",
     "http-status-codes": "^2.3.0",
     "mysql2": "^3.14.0",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
+    "redis": "^4.7.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/express": "^5.0.1",
+    "@types/express-session": "^1.18.1",
     "@types/node": "^22.14.0",
     "@typescript-eslint/eslint-plugin": "^8.29.0",
     "@typescript-eslint/parser": "^8.29.0",
