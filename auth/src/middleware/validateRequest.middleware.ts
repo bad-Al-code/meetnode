@@ -1,7 +1,8 @@
-import logger from '@/config/logger';
 import { NextFunction, Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { AnyZodObject, ZodError } from 'zod';
+
+import logger from '@/config/logger';
 
 export const validateRequest =
   (schema: AnyZodObject) =>
