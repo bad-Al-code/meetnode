@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "dist/server.js",
   "scripts": {
-    "dev": "npx ts-node-dev --respawn --transpile-only --ignore-watch node_modules src/server.ts",
+    "dev": "npx ts-node-dev -r tsconfig-paths/register --respawn --transpile-only --ignore-watch node_modules src/server.ts",
     "build": "npx tsc",
     "start": "node dist/server.js",
     "lint": "npx eslint . --ext .ts",
@@ -20,6 +20,7 @@
     "express": "^5.1.0",
     "http-status-codes": "^2.3.0",
     "pino": "^9.6.0",
+    "pino-http": "^10.4.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -33,6 +34,7 @@
     "pino-pretty": "^13.0.0",
     "prettier": "^3.5.3",
     "ts-node-dev": "^2.0.0",
+    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.2"
   }
 }
