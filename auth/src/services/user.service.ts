@@ -149,3 +149,29 @@ export async function createUser(
 
   return createdUser;
 }
+
+export async function findUserByEmail(
+  email: string
+): Promise<SelectUser | null> {
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email),
+    });
+
+    if (!user) {
+      logger.debug(`User not found with emai: ${email}`);
+      return null;
+    }
+
+    return user;
+  } catch (error) {
+    logger.error(
+      { err: error },
+      `Database error finding user by email: ${email}`
+    );
+
+    throw new InternalServerError(
+      'Failed to retrieve user data due to a database error.'
+    );
+  }
+}
