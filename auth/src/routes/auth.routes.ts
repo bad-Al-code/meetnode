@@ -3,6 +3,7 @@ import { Router } from 'express';
 import {
   getCurrentUserHandler,
   loginHandler,
+  logoutHandler,
   signupHandler,
 } from '@/controllers/auth.controller';
 import { validateRequest } from '@/middleware/validateRequest.middleware';
@@ -14,5 +15,6 @@ const router = Router();
 router.post('/signup', validateRequest(signupSchema), signupHandler);
 router.post('/login', validateRequest(loginSchema), loginHandler);
 router.get('/me', requireAuth, getCurrentUserHandler);
+router.post('/logout', requireAuth, logoutHandler);
 
 export { router as authRouter };

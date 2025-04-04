@@ -4,8 +4,9 @@ import { StatusCodes } from 'http-status-codes';
 import { LoginBody, SignupBody } from '@/schema/auth.schema';
 import logger from '@/config/logger';
 import { createUser, findUserByEmail } from '@/services/user.service';
-import { UnauthorizedError } from '@/utils/errors';
+import { InternalServerError, UnauthorizedError } from '@/utils/errors';
 import { verifyPassword } from '@/utils/hash';
+import { env } from '@/config/env';
 
 export const signupHandler = async (
   req: Request<unknown, unknown, SignupBody>,
@@ -119,4 +120,28 @@ export const getCurrentUserHandler = async (
     logger.error({ err: error }, 'Error occurred in getCurrentUserHandler');
     next(error);
   }
+};
+
+export const logoutHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const userId = req.session.user?.id;
+
+  req.session.destroy((err) => {
+    if (err) {
+      return next(
+        new InternalServerError('Count not log out. Please try again.')
+      );
+    }
+  });
+
+  res.clearCookie(env.SESSION_NAME, {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'prod',
+    sameSite: 'lax',
+  });
+
+  res.status(StatusCodes.OK).json({ message: 'Logout successful.' });
 };
