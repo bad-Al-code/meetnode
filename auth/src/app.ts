@@ -15,6 +15,7 @@ import { errorHandler } from './middleware/errorHandler.middleware';
 import { setupLogging } from './loaders/logging';
 import { setupSession } from './loaders/session';
 import { apiLimiterConfig } from './config/rateLimit';
+import { authRouter } from './routes/auth.routes';
 
 const app: Express = express();
 
@@ -24,7 +25,7 @@ app.use(helmet());
 
 setupLogging(app);
 
-app.use(rateLimit(apiLimiterConfig));
+app.use('/api', rateLimit(apiLimiterConfig));
 
 app.use(json());
 app.use(urlencoded({ extended: true }));
@@ -47,6 +48,12 @@ app.get('/error', (req: Request, res: Response, next: NextFunction) => {
 
 app.get('/apierror', (req: Request, res: Response, next: NextFunction) => {
   next(new NotFoundError('Resource not found via /apierror'));
+});
+
+app.use('/api/auth', authRouter);
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  next(new NotFoundError(`Route ${req.method} ${req.originalUrl} not found.`));
 });
 
 app.use(errorHandler);

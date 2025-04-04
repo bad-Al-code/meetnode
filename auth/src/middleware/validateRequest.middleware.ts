@@ -29,11 +29,13 @@ export const validateRequest =
         'Unexpected error during request validation middleware'
       );
 
-      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json([
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json([
         {
           statusCode: StatusCodes.INTERNAL_SERVER_ERROR,
           message: 'An internal error occured during request validation',
         },
       ]);
+
+      return;
     }
   };
