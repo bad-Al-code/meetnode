@@ -1,5 +1,3 @@
-import { throws } from 'assert';
-import { stat } from 'fs';
 import { StatusCodes } from 'http-status-codes';
 
 interface IApiError {
@@ -52,5 +50,19 @@ export class ForbiddenError extends ApiError {
   constructor(message: string = 'Forbidden', details?: any) {
     super(StatusCodes.FORBIDDEN, message, details);
     this.name = 'ForbiddenError';
+  }
+}
+
+export class ConflictError extends ApiError {
+  constructor(message: string = 'Conflict', details?: any) {
+    super(StatusCodes.CONFLICT, message, details);
+    this.name = 'ConflictError';
+  }
+}
+
+export class InternalServerError extends ApiError {
+  constructor(message: string = 'Internal Server Error', details?: any) {
+    super(StatusCodes.INTERNAL_SERVER_ERROR, message, details);
+    this.name = 'InternalServerError';
   }
 }
