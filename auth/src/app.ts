@@ -8,12 +8,13 @@ import express, {
 } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 import { NotFoundError } from './utils/errors';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { setupLogging } from './loaders/logging';
 import { setupSession } from './loaders/session';
-import rateLimit from 'express-rate-limit';
+import { apiLimiterConfig } from './config/rateLimit';
 
 const app: Express = express();
 
@@ -23,15 +24,7 @@ app.use(helmet());
 
 setupLogging(app);
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many request from this IP, please try again after 15 minutes',
-});
-
-app.use(limiter);
+app.use(rateLimit(apiLimiterConfig));
 
 app.use(json());
 app.use(urlencoded({ extended: true }));
