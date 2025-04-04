@@ -29,7 +29,7 @@ export async function verifyPassword(
 ): Promise<boolean> {
   try {
     const [saltHex, storedHashHex] = storedPassword.split('.');
-    if (!saltHex || storedHashHex) {
+    if (!saltHex || !storedHashHex) {
       return false;
     }
 
