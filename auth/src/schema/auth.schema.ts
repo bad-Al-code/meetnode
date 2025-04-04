@@ -42,12 +42,12 @@ export const signupSchema = z.object({
   }),
 });
 
-export const loginSchema = z.object({ 
-  body: z.object({ 
-    email: emailSchema, 
-    password: z.string().min(1, 'Password is required');
-  })
-})
+export const loginSchema = z.object({
+  body: z.object({
+    email: emailSchema,
+    password: z.string().min(1, 'Password is required'),
+  }),
+});
 
 export type SignupBody = z.infer<typeof signupSchema>['body'];
 export type LoginBody = z.infer<typeof loginSchema>['body'];
