@@ -98,3 +98,25 @@ export const loginHandler = async (
     next(error);
   }
 };
+
+export const getCurrentUserHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const sessionUser = req.session.user;
+
+    if (!sessionUser) {
+      return next(new UnauthorizedError('Authentication required.'));
+    }
+
+    res.status(StatusCodes.OK).json({
+      message: 'Current user retrieved successfully',
+      user: sessionUser,
+    });
+  } catch (error) {
+    logger.error({ err: error }, 'Error occurred in getCurrentUserHandler');
+    next(error);
+  }
+};
