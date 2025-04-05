@@ -8,7 +8,6 @@ import { env } from '@/config/env';
 const redisStore = new RedisStore({
   client: redisClient,
   prefix: 'auth_sess',
-  disableTouch: true,
 });
 
 const sessionOptions: session.SessionOptions = {
