@@ -1,10 +1,17 @@
-import { eq, or } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import { and, eq, or } from 'drizzle-orm';
 
 import logger from '@/config/logger';
 import { db } from '@/db';
-import { InsertUser, SelectUser, users } from '@/db/schema';
+import {
+  InsertUser,
+  oauthAccounts,
+  oauthProviders,
+  SelectUser,
+  users,
+} from '@/db/schema';
 import { hashPassword } from '@/utils/hash';
-import { ConflictError, InternalServerError } from '@/utils/errors';
+import { BaseError, ConflictError, InternalServerError } from '@/utils/errors';
 
 type CreateUserInput = Omit<
   InsertUser,
@@ -13,7 +20,7 @@ type CreateUserInput = Omit<
 
 type CreateUserOutput = Omit<SelectUser, 'hashedPassword'>;
 
-async function checkExistingUser(
+export async function checkExistingUser(
   email: string,
   username?: string | null
 ): Promise<void> {
@@ -60,7 +67,7 @@ async function checkExistingUser(
   }
 }
 
-async function getHashedPassword(
+export async function getHashedPassword(
   password: string,
   email: string
 ): Promise<string> {
@@ -74,7 +81,7 @@ async function getHashedPassword(
   }
 }
 
-async function insertNewUser(
+export async function insertNewUser(
   newUserInput: InsertUser
 ): Promise<CreateUserOutput> {
   try {
@@ -172,6 +179,128 @@ export async function findUserByEmail(
 
     throw new InternalServerError(
       'Failed to retrieve user data due to a database error.'
+    );
+  }
+}
+
+interface GitHubUserData {
+  id: number;
+  login: string;
+  name?: string | null;
+  email: string;
+  avatar_url?: string;
+}
+
+export async function findOrCreateUserForGithub(
+  githubUser: GitHubUserData
+): Promise<SelectUser> {
+  const providerId: (typeof oauthProviders)[number] = 'github';
+  const providerUserId = String(githubUser.id);
+  const verifiedEmail = githubUser.email;
+
+  try {
+    const user = await db.transaction(async (tx) => {
+      const existingOAuthAccount = await tx.query.oauthAccounts.findFirst({
+        where: and(
+          eq(oauthAccounts.providerId, providerId),
+          eq(oauthAccounts.providerUserId, providerUserId)
+        ),
+        with: {
+          user: true,
+        },
+      });
+
+      if (existingOAuthAccount?.user) {
+        if (!existingOAuthAccount.user) {
+          logger.error(
+            `OAuth account ${existingOAuthAccount.providerUserId} found but related user data is missing.`
+          );
+
+          throw new InternalServerError(
+            'Failed to retrieve user details for linked GitHub account.'
+          );
+        }
+        return existingOAuthAccount.user;
+      }
+
+      const existingUserByEmail = await tx.query.users.findFirst({
+        where: eq(users.email, verifiedEmail),
+      });
+
+      if (existingUserByEmail) {
+        await tx.insert(oauthAccounts).values({
+          providerId: providerId,
+          providerUserId: providerUserId,
+          userId: existingUserByEmail.id,
+        });
+
+        return existingUserByEmail;
+      }
+
+      const newUserInput: InsertUser = {
+        email: verifiedEmail,
+        username: githubUser.login,
+        hashedPassword: null,
+        role: 'user',
+        acceptedTerms: true,
+      };
+
+      let finalUsername = newUserInput.username;
+      try {
+        await tx.insert(users).values(newUserInput);
+      } catch (insertError: any) {
+        if (
+          insertError.code === 'ER_DUP_ENTRY' &&
+          insertError.message.includes('users.username')
+        ) {
+          logger.warn(
+            `Username conflict for ${newUserInput.username}. Appending random suffix.`
+          );
+
+          finalUsername = `${newUserInput.username}_${randomBytes(4).toString('hex')}`;
+          newUserInput.username = finalUsername;
+
+          await tx.insert(users).values(newUserInput);
+        } else {
+          throw insertError;
+        }
+      }
+
+      const newlyCreatedUser = await tx.query.users.findFirst({
+        where: eq(users.email, verifiedEmail),
+      });
+
+      if (!newlyCreatedUser) {
+        throw new InternalServerError(
+          'Failed to verify new user creation during GitHub signup.'
+        );
+      }
+
+      await tx.insert(oauthAccounts).values({
+        providerId: providerId,
+        providerUserId: providerUserId,
+        userId: newlyCreatedUser.id,
+      });
+
+      logger.info(
+        `Successfully linked GitHub account ${providerUserId} to new user ${newlyCreatedUser.id}`
+      );
+      return newlyCreatedUser;
+    });
+
+    return user;
+  } catch (error: any) {
+    logger.error(
+      { err: error },
+      `Error in findOrCreateUserForGithub for GitHub ID: ${providerUserId}`
+    );
+    // Handle specific errors like ConflictError if necessary, otherwise wrap as InternalServerError
+    if (error instanceof BaseError) {
+      // Includes ConflictError, BadRequestError etc.
+      throw error; // Re-throw known errors
+    }
+    throw new InternalServerError(
+      'Failed to process GitHub user association due to a database error.'
     );
   }
 }
