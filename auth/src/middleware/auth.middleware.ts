@@ -3,7 +3,6 @@ import { NextFunction, Request, Response } from 'express';
 import { ForbiddenError, UnauthorizedError } from '@/utils/errors';
 import logger from '@/config/logger';
 import { roles } from '@/db/schema';
-import { P } from 'pino';
 
 export const requireAuth = (
   req: Request,

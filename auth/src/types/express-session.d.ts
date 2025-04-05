@@ -2,6 +2,7 @@ interface CustomSessionData {
   user?: {
     id: string;
     role: 'user' | 'admin';
+    email: string;
   };
 }
 

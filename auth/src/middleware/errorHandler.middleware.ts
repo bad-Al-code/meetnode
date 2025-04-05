@@ -1,9 +1,10 @@
-import { env } from '@/config/env';
-import logger from '@/config/logger';
-import { ApiError, BaseError } from '@/utils/errors';
 import { NextFunction, Request, Response } from 'express';
 import { StatusCodes } from 'http-status-codes';
 import { ZodError } from 'zod';
+
+import { env } from '@/config/env';
+import logger from '@/config/logger';
+import { ApiError, BaseError } from '@/utils/errors';
 
 interface IErrorResponse {
   message: string;

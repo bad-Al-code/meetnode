@@ -16,6 +16,7 @@ import { setupLogging } from './loaders/logging';
 import { setupSession } from './loaders/session';
 import { apiLimiterConfig } from './config/rateLimit';
 import { authRouter } from './routes/auth.routes';
+import { adminRouter } from './routes/admin.routes';
 
 const app: Express = express();
 
@@ -51,6 +52,7 @@ app.get('/apierror', (req: Request, res: Response, next: NextFunction) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   next(new NotFoundError(`Route ${req.method} ${req.originalUrl} not found.`));
