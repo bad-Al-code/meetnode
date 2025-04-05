@@ -1,15 +1,30 @@
 services:
+  auth-app:
+    container_name: meetnode_auth_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      mysql_db:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+    networks:
+      - auth_network
+
   mysql_db:
     image: mysql:8.0-bookworm
     container_name: auth_mysql_db
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    env_file:
+      - .env
     ports:
-      - '${MYSQL_PORT}:3306'
+      - '${MYSQL_PORT:-3306}:3306'
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -27,6 +42,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - auth_network
 
   redis_cache:
     image: redis:alpine3.20
@@ -42,9 +59,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      - auth_network
 
 volumes:
   mysql_data:
     driver: local
   redis_data:
     driver: local
+
+networks:
+  auth_network:
+    driver: bridge
