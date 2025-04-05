@@ -241,6 +241,8 @@ export const githubCallbackHandler = async (
       throw new InternalServerError(`Failed to obtain a valid github token.`);
     }
 
+    logger.info(`GitHub access token obtained successfully.`);
+
     res.status(StatusCodes.OK).json({
       message: 'Github OAuth state verified. Token exchange and login pending',
     });
