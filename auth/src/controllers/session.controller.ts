@@ -3,12 +3,15 @@ import { StatusCodes } from 'http-status-codes';
 
 import { UpdatePrefsBody } from '@/schema/session.shema';
 import { InternalServerError } from '@/utils/errors';
+import logger from '@/config/logger';
 
 export const updatePreferencesHandler = async (
   req: Request<unknown, unknown, UpdatePrefsBody>,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  const userId = req.session.user?.id;
+
   try {
     const prefsToUpdate = req.body;
 
@@ -16,11 +19,12 @@ export const updatePreferencesHandler = async (
       req.session.prefs = {};
     }
 
-    for (const key in prefsToUpdate) {
-      if (Object.prototype.hasOwnProperty.call(prefsToUpdate, key)) {
-        req.session.prefs[key as keyof UpdatePrefsBody] =
-          prefsToUpdate[key as keyof UpdatePrefsBody];
-      }
+    if (prefsToUpdate.theme !== undefined) {
+      req.session.prefs.theme = prefsToUpdate.theme;
+    }
+
+    if (prefsToUpdate.language !== undefined) {
+      req.session.prefs.language = prefsToUpdate.language;
     }
 
     req.session.save((err) => {
@@ -38,6 +42,11 @@ export const updatePreferencesHandler = async (
       });
     });
   } catch (error) {
+    logger.error(
+      { err: error },
+      `Error occurred in updatePreferencesHandler for user ID: ${userId}`
+    );
+
     next(error);
   }
 };
