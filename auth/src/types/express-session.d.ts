@@ -7,11 +7,12 @@ interface CustomSessionData {
   user?: {
     id: string;
     role: 'user' | 'admin';
-    email: string;
+    email?: string;
     username?: string | null;
   };
 
   prefs?: UserPrefences;
+  oauthState?: string;
 }
 
 declare module 'express-session' {

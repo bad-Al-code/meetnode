@@ -7,6 +7,7 @@ import { createUser, findUserByEmail } from '@/services/user.service';
 import { InternalServerError, UnauthorizedError } from '@/utils/errors';
 import { verifyPassword } from '@/utils/hash';
 import { env } from '@/config/env';
+import { randomBytes } from 'crypto';
 
 export const signupHandler = async (
   req: Request<unknown, unknown, SignupBody>,
@@ -144,4 +145,34 @@ export const logoutHandler = async (
   });
 
   res.status(StatusCodes.OK).json({ message: 'Logout successful.' });
+};
+
+export const githubOAuthHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const state = randomBytes(16).toString('hex');
+    req.session.oauthState = state;
+
+    const authorizationUrl = new URL(
+      'https://github.com/login/oauth/authorize'
+    );
+    authorizationUrl.searchParams.append('client_id', env.GITHUB_CLIENT_ID);
+    authorizationUrl.searchParams.append(
+      'redirect_url',
+      env.GITHUB_CALLBACK_URL
+    );
+    authorizationUrl.searchParams.append('scope', 'read:user user:email');
+    authorizationUrl.searchParams.append('state', state);
+
+    logger.info(`Redrecting user to Github for authorization. State: ${state}`);
+
+    res.redirect(authorizationUrl.toString());
+  } catch (error) {
+    logger.error({ err: error }, 'Error initializing Github Oauth flow.');
+
+    next(error);
+  }
 };

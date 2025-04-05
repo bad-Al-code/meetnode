@@ -37,6 +37,10 @@ const EnvSchema = z.object({
     .int()
     .positive()
     .default(24 * 60 * 60 * 1000),
+
+  GITHUB_CLIENT_ID: z.string().min(1, 'GITHUB_CLIENT_ID is required'),
+  GITHUB_CLIENT_SECRET: z.string().min(1, 'GITHUB_CLIENT_SECRET is required'),
+  GITHUB_CALLBACK_URL: z.string().url('GITHUB_CALLBACK_URL mus be a valid URL'),
 });
 
 const parsedEnv = EnvSchema.safeParse(process.env);
