@@ -13,6 +13,8 @@ import { verifyPassword } from '@/utils/hash';
 import { env } from '@/config/env';
 import { randomBytes } from 'crypto';
 import axios from 'axios';
+import { setMaxIdleHTTPParsers } from 'http';
+import { intersect } from 'drizzle-orm/gel-core';
 
 export const signupHandler = async (
   req: Request<unknown, unknown, SignupBody>,
@@ -182,6 +184,21 @@ export const githubOAuthHandler = async (
   }
 };
 
+interface GithubUser {
+  id: number;
+  login: string;
+  name?: string;
+  email?: string | null;
+  avatar_url?: string;
+}
+
+interface GithubEmail {
+  email: string;
+  primary: boolean;
+  verified: boolean;
+  visibility: 'public' | 'private' | null;
+}
+
 export const githubCallbackHandler = async (
   req: Request,
   res: Response,
@@ -241,18 +258,96 @@ export const githubCallbackHandler = async (
       throw new InternalServerError(`Failed to obtain a valid github token.`);
     }
 
-    logger.info(`GitHub access token obtained successfully.`);
+    const userApiUrl = 'https://api.github.com/user';
+    const userResponse = await axios.get<GithubUser>(userApiUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    });
 
+    const githubUser: GithubUser = userResponse.data;
+
+    if (!githubUser || !githubUser.id) {
+      throw new InternalServerError(
+        `Could not retrieve user profile from Github.`
+      );
+    }
+
+    let primaryEmail: string | null = githubUser.email!;
+    if (!primaryEmail) {
+      const emailApiUrl = 'https://api.github.com/user/emails';
+
+      try {
+        const emailResponse = await axios.get<GithubEmail[]>(emailApiUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: 'application/vnd.github.v3+json',
+          },
+        });
+
+        const emails: GithubEmail[] = emailResponse.data;
+        const primaryVerifiedEmail = emails.find(
+          (e) => e.primary && e.verified
+        );
+
+        if (primaryVerifiedEmail) {
+          primaryEmail = primaryVerifiedEmail.email;
+        } else {
+          const anyVerifiedEmail = emails.find((e) => e.verified);
+          if (anyVerifiedEmail) {
+            primaryEmail = anyVerifiedEmail.email;
+          } else {
+            throw new BadRequestError(
+              `Could not find a verified email address associated with your Github acccount.`
+            );
+          }
+        }
+      } catch (emailError: any) {
+        throw new InternalServerError(
+          `Failed tp retrieve email information from Github.`
+        );
+      }
+    }
+
+    if (!primaryEmail) {
+      throw new InternalServerError(
+        `Failed to retieve email information from Github.`
+      );
+    }
     res.status(StatusCodes.OK).json({
       message: 'Github OAuth state verified. Token exchange and login pending',
+      githubProfile: {
+        id: githubUser.id,
+        username: githubUser.login,
+        name: githubUser.name,
+        email: primaryEmail,
+        avatar: githubUser.avatar_url,
+      },
     });
   } catch (error: any) {
-    if (axios.isAxiosError(error)) {
-      next(
-        new InternalServerError(
-          `Failed to communicate with Github to exchange token.`
-        )
+    if (axios.isAxiosError(error) && error.message) {
+      logger.error(
+        {
+          err: {
+            message: error.message,
+            url: error.config?.url,
+            status: error.response?.status,
+            data: error.response?.data,
+          },
+        },
+        `Axios error during GitHub API call (${error.response?.status})`
       );
+
+      if (error.response?.status === 401) {
+        next(
+          new UnauthorizedError(
+            `Invalid or expired Github token. Please try loggin in again`
+          )
+        );
+      } else {
+        next(new InternalServerError(`Failed to communicate with Github API.`));
+      }
     } else if (
       error instanceof UnauthorizedError ||
       error instanceof BadRequestError ||
@@ -268,6 +363,11 @@ export const githubCallbackHandler = async (
       }
       next(error);
     } else {
+      logger.error(
+        { err: error },
+        'Unexpected error processing GitHub OAuth callback'
+      );
+
       next(
         new InternalServerError(
           'An unexpected error occured during Github login'
