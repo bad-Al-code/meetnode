@@ -4,29 +4,30 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     restart: unless-stopped
     env_file:
       - .env
     ports:
       - '${PORT:-3000}:3000'
     depends_on:
-      mysql_db:
+      db:
         condition: service_healthy
-      redis_cache:
+      cache:
         condition: service_healthy
     networks:
-      - auth_network
+      - meetnote_auth_network
 
-  mysql_db:
+  db:
     image: mysql:8.0-bookworm
-    container_name: auth_mysql_db
+    container_name: meetnote-auth-db
     restart: unless-stopped
     env_file:
       - .env
     ports:
       - '${MYSQL_PORT:-3306}:3306'
     volumes:
-      - mysql_data:/var/lib/mysql
+      - meetnote_auth_mysql_data:/var/lib/mysql
     healthcheck:
       test:
         [
@@ -43,16 +44,16 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - auth_network
+      - meetnote_auth_network
 
-  redis_cache:
+  cache:
     image: redis:alpine3.20
-    container_name: auth_redis_cache
+    container_name: meetnote-auth-redis
     restart: unless-stopped
     ports:
       - '${REDIS_PORT}:6379'
     volumes:
-      - redis_data:/data
+      - meetnote_auth_redis_data:/data
     command: redis-server --save 60 1 --loglevel warning
     healthcheck:
       test: ['CMD', 'redis-cli', '--raw', 'ping']
@@ -60,14 +61,14 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - auth_network
+      - meetnote_auth_network
 
 volumes:
-  mysql_data:
+  meetnote_auth_mysql_data:
     driver: local
-  redis_data:
+  meetnote_auth_redis_data:
     driver: local
 
 networks:
-  auth_network:
+  meetnote_auth_network:
     driver: bridge
