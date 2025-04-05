@@ -7,7 +7,7 @@ import { env } from '@/config/env';
 
 const redisStore = new RedisStore({
   client: redisClient,
-  prefix: 'auth_sess',
+  prefix: 'auth_sess:',
 });
 
 const sessionOptions: session.SessionOptions = {
