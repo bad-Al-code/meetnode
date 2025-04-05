@@ -4,10 +4,15 @@ import { StatusCodes } from 'http-status-codes';
 import { LoginBody, SignupBody } from '@/schema/auth.schema';
 import logger from '@/config/logger';
 import { createUser, findUserByEmail } from '@/services/user.service';
-import { InternalServerError, UnauthorizedError } from '@/utils/errors';
+import {
+  BadRequestError,
+  InternalServerError,
+  UnauthorizedError,
+} from '@/utils/errors';
 import { verifyPassword } from '@/utils/hash';
 import { env } from '@/config/env';
 import { randomBytes } from 'crypto';
+import session from 'express-session';
 
 export const signupHandler = async (
   req: Request<unknown, unknown, SignupBody>,
@@ -175,4 +180,46 @@ export const githubOAuthHandler = async (
 
     next(error);
   }
+};
+
+export const githubCallbackHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  const { code, state } = req.query;
+
+  const sessionState = req.session.oauthState;
+
+  if (req.session) {
+    delete req.session.oauthState;
+  }
+
+  try {
+    if (!state || !sessionState || state !== sessionState) {
+      throw new UnauthorizedError(
+        `Invalid OAuth state. Potential CSRF attack or session issue,`
+      );
+    }
+
+    if (req.query.error) {
+      throw new BadRequestError(
+        `Github Authoriztion failed: ${req.query.error_description || req.query.error} `
+      );
+    }
+
+    if (!code || typeof code !== 'string') {
+      throw new BadRequestError(
+        'Github authorization failed. No code received'
+      );
+    }
+
+    logger.info(
+      `GitHub OAuth state verified successfully for code: ${code.substring(0, 10)}...`
+    );
+
+    res.status(StatusCodes.OK).json({
+      message: 'Github OAuth state verified. Token exchange and login pending',
+    });
+  } catch (error) {}
 };

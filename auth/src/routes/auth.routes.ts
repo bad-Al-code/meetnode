@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import {
   getCurrentUserHandler,
+  githubCallbackHandler,
   githubOAuthHandler,
   loginHandler,
   logoutHandler,
@@ -19,5 +20,6 @@ router.get('/me', requireAuth, getCurrentUserHandler);
 router.post('/logout', requireAuth, logoutHandler);
 
 router.get('/github', githubOAuthHandler);
+router.get('/github/callback', githubCallbackHandler);
 
 export { router as authRouter };
