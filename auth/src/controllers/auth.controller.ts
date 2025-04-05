@@ -12,7 +12,7 @@ import {
 import { verifyPassword } from '@/utils/hash';
 import { env } from '@/config/env';
 import { randomBytes } from 'crypto';
-import session from 'express-session';
+import axios from 'axios';
 
 export const signupHandler = async (
   req: Request<unknown, unknown, SignupBody>,
@@ -214,12 +214,63 @@ export const githubCallbackHandler = async (
       );
     }
 
-    logger.info(
-      `GitHub OAuth state verified successfully for code: ${code.substring(0, 10)}...`
-    );
+    const tokenUrl = `https://github.com/login/oauth/access_token`;
+    const tokenParams = {
+      client_id: env.GITHUB_CLIENT_ID,
+      client_secret: env.GITHUB_CLIENT_SECRET,
+      code: code,
+      redirect_url: env.GITHUB_CALLBACK_URL,
+    };
+
+    const tokenResponse = await axios.post(tokenUrl, tokenParams, {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (tokenResponse.data.error) {
+      throw new InternalServerError(
+        `Failed to obtain Github access token: ${tokenResponse.data.error_description || tokenResponse.data.error}`
+      );
+    }
+
+    const accessToken = tokenResponse.data.access_token;
+
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new InternalServerError(`Failed to obtain a valid github token.`);
+    }
 
     res.status(StatusCodes.OK).json({
       message: 'Github OAuth state verified. Token exchange and login pending',
     });
-  } catch (error) {}
+  } catch (error: any) {
+    if (axios.isAxiosError(error)) {
+      next(
+        new InternalServerError(
+          `Failed to communicate with Github to exchange token.`
+        )
+      );
+    } else if (
+      error instanceof UnauthorizedError ||
+      error instanceof BadRequestError ||
+      error instanceof InternalServerError
+    ) {
+      if (
+        error instanceof UnauthorizedError ||
+        error instanceof BadRequestError
+      ) {
+        logger.warn(`OAuth error: ${error.message}`);
+      } else {
+        logger.warn(`OAuth Processing error: ${error.message}`);
+      }
+      next(error);
+    } else {
+      next(
+        new InternalServerError(
+          'An unexpected error occured during Github login'
+        )
+      );
+    }
+  }
 };
