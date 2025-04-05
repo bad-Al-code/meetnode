@@ -42,12 +42,12 @@ export const users = mysqlTable(
   ]
 );
 
-export const oauthProvider = ['github', 'google'] as const;
+export const oauthProviders = ['github', 'google'] as const;
 
 export const oauthAccounts = mysqlTable(
   'oauth_accounts',
   {
-    providerId: mysqlEnum('provider_id', oauthProvider).notNull(),
+    providerId: mysqlEnum('provider_id', oauthProviders).notNull(),
     providerUserId: varchar('provider_user_id', { length: 255 }).notNull(),
     userId: varchar('user_id', { length: 36 })
       .notNull()
@@ -64,14 +64,11 @@ export const oauthAccounts = mysqlTable(
       .default(sql`CURRENT_TIMESTAMP`)
       .onUpdateNow(),
   },
-  (table) => ({
-    pk: primaryKey({ columns: [table.providerId, table.providerUserId] }),
-    userIdIdx: index('oauth_user_id_idx').on(table.userId),
-    userIdProviderUk: uniqueIndex('oauth_user_provider_uk').on(
-      table.userId,
-      table.providerId
-    ),
-  })
+  (table) => [
+    primaryKey({ columns: [table.providerId, table.providerUserId] }),
+    index('oauth_user_id_idx').on(table.userId),
+    uniqueIndex('oauth_user_provider_uk').on(table.userId, table.providerId),
+  ]
 );
 
 export type SelectUser = typeof users.$inferSelect;
@@ -84,7 +81,7 @@ export const userRelations = relations(users, ({ many }) => ({
 }));
 
 export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
-  users: one(users, {
+  user: one(users, {
     fields: [oauthAccounts.userId],
     references: [users.id],
   }),
