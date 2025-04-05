@@ -3,7 +3,12 @@ import { StatusCodes } from 'http-status-codes';
 
 import { LoginBody, SignupBody } from '@/schema/auth.schema';
 import logger from '@/config/logger';
-import { createUser, findUserByEmail } from '@/services/user.service';
+import {
+  createUser,
+  findOrCreateUserForGithub,
+  findUserByEmail,
+  GitHubUserData,
+} from '@/services/user.service';
 import {
   BadRequestError,
   InternalServerError,
@@ -315,15 +320,40 @@ export const githubCallbackHandler = async (
         `Failed to retieve email information from Github.`
       );
     }
-    res.status(StatusCodes.OK).json({
-      message: 'Github OAuth state verified. Token exchange and login pending',
-      githubProfile: {
-        id: githubUser.id,
-        username: githubUser.login,
-        name: githubUser.name,
-        email: primaryEmail,
-        avatar: githubUser.avatar_url,
-      },
+
+    const userDataForService: GitHubUserData = {
+      id: githubUser.id,
+      login: githubUser.login,
+      name: githubUser.name,
+      email: primaryEmail,
+      avatar_url: githubUser.avatar_url,
+    };
+
+    const localUser = await findOrCreateUserForGithub(userDataForService);
+
+    const sessionUser = {
+      id: localUser.id,
+      role: localUser.role,
+      email: localUser.email,
+      username: localUser.username,
+    };
+
+    req.session.regenerate((err) => {
+      if (err) {
+        return next(
+          new InternalServerError(
+            `Login Failed. Could not login for user ${localUser.id}`
+          )
+        );
+      }
+
+      req.session.user = sessionUser;
+
+      res.status(StatusCodes.OK).json({
+        message:
+          'Github OAuth state verified. Token exchange and login pending',
+        user: sessionUser,
+      });
     });
   } catch (error: any) {
     if (axios.isAxiosError(error) && error.message) {

@@ -183,7 +183,7 @@ export async function findUserByEmail(
   }
 }
 
-interface GitHubUserData {
+export interface GitHubUserData {
   id: number;
   login: string;
   name?: string | null;
