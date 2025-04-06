@@ -294,10 +294,8 @@ export async function findOrCreateUserForGithub(
       { err: error },
       `Error in findOrCreateUserForGithub for GitHub ID: ${providerUserId}`
     );
-    // Handle specific errors like ConflictError if necessary, otherwise wrap as InternalServerError
     if (error instanceof BaseError) {
-      // Includes ConflictError, BadRequestError etc.
-      throw error; // Re-throw known errors
+      throw error;
     }
     throw new InternalServerError(
       'Failed to process GitHub user association due to a database error.'
