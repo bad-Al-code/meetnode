@@ -42,7 +42,7 @@ export const users = mysqlTable(
   ]
 );
 
-export const oauthProviders = ['github', 'google'] as const;
+export const oauthProviders = ['github', 'google', 'discord'] as const;
 
 export const oauthAccounts = mysqlTable(
   'oauth_accounts',
