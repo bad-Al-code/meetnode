@@ -38,6 +38,10 @@ const EnvSchema = z.object({
     .positive()
     .default(24 * 60 * 60 * 1000),
 
+  OAUTH_REDIRECT_URL_BASE: z
+    .string()
+    .url('OAUTH_REDIRECT_URL_BASE must be a valid URL and is required'),
+
   GITHUB_CLIENT_ID: z.string().min(1, 'GITHUB_CLIENT_ID is required'),
   GITHUB_CLIENT_SECRET: z.string().min(1, 'GITHUB_CLIENT_SECRET is required'),
   // GITHUB_CALLBACK_URL: z.string().url('GITHUB_CALLBACK_URL mus be a valid URL'),
