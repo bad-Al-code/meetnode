@@ -9,6 +9,7 @@ import express, {
 import { StatusCodes } from 'http-status-codes';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import cookieParser from 'cookie-parser';
 
 import { NotFoundError } from './utils/errors';
 import { errorHandler } from './middleware/errorHandler.middleware';
@@ -32,6 +33,7 @@ app.use('/api', rateLimit(apiLimiterConfig));
 app.use(json());
 app.use(urlencoded({ extended: true }));
 
+app.use(cookieParser());
 setupSession(app);
 
 app.get('/health', (req: Request, res: Response) => {
