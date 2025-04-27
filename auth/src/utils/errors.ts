@@ -66,3 +66,47 @@ export class InternalServerError extends ApiError {
     this.name = 'InternalServerError';
   }
 }
+
+export class InvalidStateError extends ApiError {
+  constructor(
+    message: string = 'Invalid OAuth State: State parameter mismatch or cookie missing.',
+    details?: any
+  ) {
+    super(StatusCodes.BAD_REQUEST, message, details);
+    this.name = 'InvalidStateError';
+  }
+}
+
+export class InvalidCodeVerifierError extends ApiError {
+  constructor(
+    message: string = 'Invalid or missing OAuth Code Verifier cookie.',
+    details: any
+  ) {
+    super(StatusCodes.BAD_REQUEST, message, details);
+    this.name = 'InvalidCodeVerifier';
+  }
+}
+
+export class InvalidTokenError extends ApiError {
+  constructor(message: string = 'Invalid OAuth Token Response', details?: any) {
+    super(StatusCodes.BAD_REQUEST, message, details);
+    this.name = 'InvalidTokenError';
+  }
+}
+
+export class InvalidUserError extends ApiError {
+  constructor(
+    message: string = 'Invalid OAuth User Info Response',
+    details?: any
+  ) {
+    super(StatusCodes.BAD_GATEWAY, message, details);
+    this.name = 'InvalidUserError';
+  }
+}
+
+export class ValidationError extends BadRequestError {
+  constructor(message: string = 'Validation Failed', details: any) {
+    super(message, details);
+    this.name = 'ValidationError';
+  }
+}

@@ -28,22 +28,5 @@ function createCodeVerifier(res: Response): string {
 }
 
 function getCodeVerifier(req: Request): string {
-  // TODO:
   throw new Error('getCodeVerifier function not implemented');
-}
-
-class InvalidState extends Error {
-  // TODO
-}
-
-class InvalidCodeVerifierError extends Error {
-  // TODO
-}
-
-class InvalidTokenError extends Error {
-  // TODO
-}
-
-class InvalidUserError extends Error {
-  // TODO
 }
