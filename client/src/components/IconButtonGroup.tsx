@@ -30,7 +30,7 @@ export const IconButtonGroup: React.FC<IconButtonGroupProps> = ({
   onClickRight,
   variant = "destructive",
   separatorColor = "divide-neutral-100",
-  separatorWidth = "divide-x-2",
+  separatorWidth = "divide-x-1",
   className,
   buttonLeftClassName,
   buttonRightClassName,
