@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import config from './config';
 import { app } from './app';
 import logger from './shared/utils/logger';
+import { closeDbConnection } from './db';
 
 const PORT = config.port;
 
@@ -10,17 +11,20 @@ const httpServer = createServer(app);
 
 const shutdown = async (signal: string) => {
   logger.warn(`Received ${signal}. Shutting down gracefully...`);
+  let exitCode = 0;
 
   httpServer.close(async (err?: Error) => {
     if (err) {
       logger.error('Error during HTTP server shutdown:', err);
+      exitCode = 1;
     } else {
       logger.info('HTTP server closed successfully.');
     }
 
-    logger.info('Graceful shutdown complete.');
+    await closeDbConnection();
 
-    process.exit(err ? 1 : 0);
+    logger.info('Graceful shutdown complete.');
+    process.exit(exitCode);
   });
 
   setTimeout(() => {
