@@ -9,19 +9,24 @@ import express, {
 import config from './config';
 import logger from './shared/utils/logger';
 import { StatusCodes } from 'http-status-codes';
+import { NotFoundError } from './shared/errors';
+import { errorHandler } from './middleware/errorHandler.middleware';
 
 const app: Express = express();
 
-app.use(json());
-app.use(urlencoded({ extended: true }));
+app.use(json({ limit: '10kb' }));
+app.use(urlencoded({ extended: true, limit: '10kb' }));
 
 if (config.isDevelopment) {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
+    const bodyLog =
+      req.body && Object.keys(req.body).length > 0
+        ? JSON.stringify(req.body)
+        : 'empty';
     logger.debug(
-      `--> ${req.method} ${req.originalUrl} (Body: ${req.body ? JSON.stringify(req.body) : 'empty'})`
+      `--> ${req.method} ${req.originalUrl} (Body: ${bodyLog.substring(0, 100)}${bodyLog.length > 100 ? '...' : ''})`
     );
-
     res.on('finish', () => {
       const duration = Date.now() - start;
       logger.debug(
@@ -40,13 +45,14 @@ app.get('/health', (req: Request, res: Response) => {
   });
 });
 
-app.use((req: Request, res: Response) => {
-  res.status(StatusCodes.NOT_FOUND).json({
-    error: [
-      StatusCodes.NOT_FOUND,
-      `Not Found - ${req.method} ${req.originalUrl}`,
-    ],
-  });
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const error = new NotFoundError(
+    `Resource not found at ${req.method} ${req.originalUrl}`
+  );
+
+  next(error);
 });
+
+app.use(errorHandler);
 
 export { app };

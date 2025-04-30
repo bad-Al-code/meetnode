@@ -34,7 +34,8 @@
     "express": "^5.1.0",
     "http-status-codes": "^2.3.0",
     "pino": "^9.6.0",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "zod": "^3.24.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",
