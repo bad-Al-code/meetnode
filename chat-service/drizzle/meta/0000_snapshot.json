@@ -1,5 +1,5 @@
 {
-  "id": "3f9e0073-f107-4b9c-a832-9c991323b1a6",
+  "id": "f7220bce-9001-469b-8612-33b7b86dc61a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -13,7 +13,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "uuid_generate_v4()"
+          "default": "gen_random_uuid()"
         },
         "type": {
           "name": "type",
@@ -71,7 +71,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "uuid_generate_v4()"
+          "default": "gen_random_uuid()"
         },
         "conversation_id": {
           "name": "conversation_id",
@@ -187,7 +187,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "uuid_generate_v4()"
+          "default": "gen_random_uuid()"
         },
         "conversation_id": {
           "name": "conversation_id",

@@ -1,14 +1,14 @@
 CREATE TYPE "public"."conversation_type" AS ENUM('DIRECT', 'GROUP');--> statement-breakpoint
 CREATE TYPE "public"."message_content_type" AS ENUM('TEXT', 'IMAGE', 'FILE', 'SYSTEM');--> statement-breakpoint
 CREATE TABLE "conversations" (
-	"conversation_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4() NOT NULL,
+	"conversation_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"type" "conversation_type" DEFAULT 'DIRECT' NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "messages" (
-	"message_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4() NOT NULL,
+	"message_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"conversation_id" uuid NOT NULL,
 	"sender_user_id" uuid NOT NULL,
 	"content_type" "message_content_type" DEFAULT 'TEXT' NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE "messages" (
 );
 --> statement-breakpoint
 CREATE TABLE "participants" (
-	"participant_id" uuid PRIMARY KEY DEFAULT uuid_generate_v4() NOT NULL,
+	"participant_id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"conversation_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
 	"joined_at" timestamp with time zone DEFAULT now() NOT NULL,

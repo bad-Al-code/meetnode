@@ -28,7 +28,7 @@ export const conversations = pgTable(
   {
     conversationId: uuid('conversation_id')
       .primaryKey()
-      .default(sql`uuid_generate_v4()`),
+      .default(sql`gen_random_uuid()`),
     type: conversationTypeEnum('type').notNull().default('DIRECT'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
       .notNull()
@@ -46,7 +46,7 @@ export const participants = pgTable(
   {
     participantId: uuid('participant_id')
       .primaryKey()
-      .default(sql`uuid_generate_v4()`),
+      .default(sql`gen_random_uuid()`),
     conversationId: uuid('conversation_id').notNull(),
     userId: uuid('user_id').notNull(),
     joinedAt: timestamp('joined_at', { withTimezone: true, mode: 'date' })
@@ -76,7 +76,7 @@ export const messages = pgTable(
   {
     messageId: uuid('message_id')
       .primaryKey()
-      .default(sql`uuid_generate_v4()`),
+      .default(sql`gen_random_uuid()`),
     conversationId: uuid('conversation_id').notNull(),
     senderUserId: uuid('sender_user_id').notNull(),
     contentType: messageContentTypeEnum('content_type')
