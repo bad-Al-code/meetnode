@@ -1,0 +1,50 @@
+{
+  "name": "meetnote-chat-service",
+  "version": "1.0.0",
+  "description": "Chat microservice for MeetNote",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "pnpx tsc",
+    "start": "node dist/server.js",
+    "dev": "pnpx ts-node-dev -r tsconfig-paths/register --respawn --transpile-only --exit-child --clear src/server.ts",
+    "lint": "pnpx eslint . --ext .ts",
+    "lint:fix": "pnpx eslint . --ext .ts --fix",
+    "format": "pnpx prettier --write \"src/**/*.ts\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "chat",
+    "microservice",
+    "websockets",
+    "meetnote",
+    "typescript",
+    "express"
+  ],
+  "author": "badalcodeorg",
+  "license": "ISC",
+  "packageManager": "pnpm@10.9.0",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "http-status-codes": "^2.3.0",
+    "pino": "^9.6.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.1",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.3",
+    "eslint": "^9.25.1",
+    "eslint-config-prettier": "^10.1.2",
+    "eslint-plugin-prettier": "^5.2.6",
+    "globals": "^16.0.0",
+    "pino-pretty": "^13.0.0",
+    "prettier": "^3.5.3",
+    "ts-node-dev": "^2.0.0",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.31.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
