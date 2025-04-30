@@ -11,10 +11,6 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,

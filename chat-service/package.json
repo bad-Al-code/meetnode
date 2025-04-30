@@ -6,7 +6,7 @@
   "scripts": {
     "build": "pnpx tsc",
     "start": "node dist/server.js",
-    "dev": "pnpx ts-node-dev -r tsconfig-paths/register --respawn --transpile-only --exit-child --clear src/server.ts",
+    "dev": "pnpx ts-node-dev  --respawn --transpile-only --exit-child --clear src/server.ts",
     "lint": "pnpx eslint . --ext .ts",
     "lint:fix": "pnpx eslint . --ext .ts --fix",
     "format": "pnpx prettier --write \"src/**/*.ts\"",
@@ -40,7 +40,6 @@
     "pino-pretty": "^13.0.0",
     "prettier": "^3.5.3",
     "ts-node-dev": "^2.0.0",
-    "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.31.1"
   },
