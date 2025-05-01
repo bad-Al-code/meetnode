@@ -1,4 +1,4 @@
-import { count, or, desc, eq, and, lt, isNull, gt, sql } from 'drizzle-orm';
+import { count, or, desc, eq, and, lt, isNull, gt, sql, ne } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 import * as schema from '../../db/schema';
@@ -227,7 +227,7 @@ export class ChatRepository {
   ): Promise<number> {
     const unreadCondition = lastReadTimestamp
       ? gt(schema.messages.createdAt, lastReadTimestamp)
-      : sql`TRUE`;
+      : undefined;
 
     const result = await db
       .select({ count: count(schema.messages.messageId) })
@@ -235,7 +235,7 @@ export class ChatRepository {
       .where(
         and(
           eq(schema.messages.conversationId, conversationId),
-          sql`${schema.messages.senderUserId}!==${userId}`,
+          ne(schema.messages.senderUserId, userId),
           isNull(schema.messages.deletedAt),
           unreadCondition
         )
