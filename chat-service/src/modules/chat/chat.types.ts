@@ -27,3 +27,8 @@ export interface NewMessageInput {
 }
 
 export interface MessageDetails extends Message {}
+
+export interface GetMessageOptions {
+  limit: number;
+  cursor?: Date | string;
+}
