@@ -12,6 +12,7 @@ import {
   Conversation,
   ConversationId,
   ConversationListItem,
+  CreateConversationResult,
   GetMessageOptions,
   Message,
   MessageDetails,
@@ -242,5 +243,88 @@ export class ChatService {
       await this.chatRepository.getConversationParticipants(conversationId);
 
     return participants;
+  }
+
+  async findOrCreateDirectConversation(
+    initiatorUserId: UserId,
+    participantUserId: UserId,
+    initialMessageContent?: string
+  ): Promise<CreateConversationResult> {
+    if (initiatorUserId === participantUserId) {
+      throw new BadRequestError(
+        'Cannot start a direct conversation with yourself.'
+      );
+    }
+
+    const existingConversation =
+      await this.chatRepository.findDirectConversationByUserIds(
+        initiatorUserId,
+        participantUserId
+      );
+
+    if (existingConversation) {
+      return { conversation: existingConversation, isNew: false };
+    }
+
+    const newConversation = await db.transaction(async (tx) => {
+      const [createdConv] = await tx
+        .insert(schema.conversations)
+        .values({ type: 'DIRECT' })
+        .returning();
+
+      if (!createdConv)
+        throw new InternalServerError(
+          'Failed to create conversation record in transaction.'
+        );
+
+      const participantsToInsert = [
+        { conversationId: createdConv.conversationId, userId: initiatorUserId },
+        {
+          conversationId: createdConv.conversationId,
+          userId: participantUserId,
+        },
+      ];
+      const insertedParticipants = await tx
+        .insert(schema.participants)
+        .values(participantsToInsert)
+        .returning();
+
+      if (insertedParticipants.length !== 2) {
+        throw new InternalServerError(
+          'Failed to add participants in transaction.'
+        );
+      }
+
+      if (initialMessageContent) {
+        const messageToInsert = {
+          conversationId: createdConv.conversationId,
+          senderUserId: initiatorUserId,
+          content: initialMessageContent,
+          contentType: 'TEXT' as Message['contentType'],
+        };
+
+        const [insertedMessage] = await tx
+          .insert(schema.messages)
+          .values(messageToInsert)
+          .returning();
+
+        if (!insertedMessage) {
+          throw new InternalServerError(
+            'Failed to create initial message in transaction.'
+          );
+        }
+
+        await tx
+          .update(schema.conversations)
+          .set({ updatedAt: new Date() })
+          .where(
+            eq(schema.conversations.conversationId, createdConv.conversationId)
+          );
+      }
+
+      return createdConv;
+    });
+
+    return { conversation: newConversation, isNew: true };
   }
 }

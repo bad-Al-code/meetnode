@@ -49,13 +49,16 @@ export class ChatController {
     const body = req.validatedData?.body as CreateConversationBody;
     const { participantUserId, initialMessageContent } = body;
 
-    const conversation = await this.chatService.createDirectConversation(
-      initiatorUserId,
-      participantUserId,
-      initialMessageContent
-    );
+    const { conversation, isNew } =
+      await this.chatService.findOrCreateDirectConversation(
+        initiatorUserId,
+        participantUserId,
+        initialMessageContent
+      );
 
-    res.status(StatusCodes.CREATED).json(conversation);
+    const statusCode = isNew ? StatusCodes.CREATED : StatusCodes.OK;
+
+    res.status(statusCode).json(conversation);
   };
 
   markConversationAsRead = async (

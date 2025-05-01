@@ -32,3 +32,8 @@ export interface GetMessageOptions {
   limit: number;
   cursor?: Date | string;
 }
+
+export interface CreateConversationResult {
+  conversation: Conversation;
+  isNew: boolean;
+}
