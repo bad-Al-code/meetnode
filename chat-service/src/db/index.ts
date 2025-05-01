@@ -6,8 +6,6 @@ import logger from '../shared/utils/logger';
 import * as schema from './schema';
 
 if (!config.database.url) {
-  logger.error('Database URL is not defined in the configuration.');
-
   throw new Error('Database URL is not defined');
 }
 
@@ -37,7 +35,6 @@ const db = drizzle(queryClient, {
 export const checkDbConnection = async (): Promise<boolean> => {
   try {
     await db.execute('select 1');
-    logger.info('DAtabase connected successfully.');
 
     return true;
   } catch (error) {
@@ -49,7 +46,6 @@ export const checkDbConnection = async (): Promise<boolean> => {
 export const closeDbConnection = async (): Promise<void> => {
   try {
     await queryClient.end({ timeout: 5 });
-    logger.info('Database connection pool closed successfully.');
   } catch (error) {
     logger.error('Error closing database connection pool:', error);
   }
