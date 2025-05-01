@@ -21,7 +21,7 @@ export interface ConversationListItem {
 
 export interface NewMessageInput {
   conversationId: ConversationId;
-  sendUserId: UserId;
+  senderUserId: UserId;
   content: string;
   contentType: Message['contentType'];
 }
