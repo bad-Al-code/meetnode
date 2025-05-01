@@ -13,6 +13,9 @@ declare global {
   namespace Express {
     interface Request {
       user?: JwtPayload;
+      validatedData?: { params?: any; query?: any; body?: any };
     }
   }
 }
+
+export {};

@@ -1,3 +1,4 @@
+import 'express-async-errors';
 import express, {
   Express,
   NextFunction,
@@ -6,11 +7,13 @@ import express, {
   json,
   urlencoded,
 } from 'express';
+
 import config from './config';
 import logger from './shared/utils/logger';
 import { StatusCodes } from 'http-status-codes';
 import { NotFoundError } from './shared/errors';
 import { errorHandler } from './middleware/errorHandler.middleware';
+import { chatRouter } from './modules/chat/chat.routes';
 
 const app: Express = express();
 
@@ -44,6 +47,8 @@ app.get('/health', (req: Request, res: Response) => {
     service: 'chat-service',
   });
 });
+
+app.use('/api/v1/chat', chatRouter);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const error = new NotFoundError(
