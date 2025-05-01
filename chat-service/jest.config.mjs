@@ -1,5 +1,8 @@
 import { pathsToModuleNameMapper } from 'ts-jest';
-import tsconfigData from './tsconfig.json' assert { type: 'json' };
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const tsconfigData = require('./tsconfig.json');
 
 const { compilerOptions } = tsconfigData;
 
@@ -29,7 +32,7 @@ const jestConfig = {
   }),
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   testMatch: ['<rootDir>/tests/**/*.test.ts', '<rootDir>/src/**/*.test.ts'],
-  moduleFileExtensions: ['ts', 'js', 'json', 'node'],
+  moduleFileExtensions: ['ts', 'mjs', 'js', 'json', 'node'], // Added mjs
 };
 
 export default jestConfig;
