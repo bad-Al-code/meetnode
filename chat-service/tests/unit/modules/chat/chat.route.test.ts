@@ -1,14 +1,17 @@
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, and } from 'drizzle-orm';
 import { StatusCodes } from 'http-status-codes';
 
 import { app } from '../../../../src/app';
 import config from '../../../../src/config';
 import * as schema from '../../../../src/db/schema';
 import { db } from '../../../../src/db';
-import { ConversationListItem } from '../../../../src/modules/chat/chat.types';
+import {
+  ConversationListItem,
+  Participants,
+} from '../../../../src/modules/chat/chat.types';
 
 const API_PREFIX = '/api/v1/chat';
 const JWT_SECRET = config.jwt.secret;
@@ -23,6 +26,46 @@ const generateTestToken = (userId: string): string => {
   if (!JWT_SECRET) throw new Error('Test JWT_SECRET is not defined');
 
   return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '5m' });
+};
+
+const createConv = async () => {
+  const response = await request(app)
+    .post(`${API_PREFIX}/conversations`)
+    .set('Authorization', `Bearer ${tokenUser1}`)
+    .send({ participantUserId: USER_ID_2 });
+
+  if (
+    response.status !== StatusCodes.CREATED &&
+    response.status !== StatusCodes.OK
+  ) {
+    throw new Error(
+      `Failed to create/find conversation in test helper, status: ${response.status}, body: ${JSON.stringify(response.body)}`
+    );
+  }
+  if (!response.body?.conversationId) {
+    throw new Error(
+      `Conversation ID missing from response body in test helper`
+    );
+  }
+
+  return response.body.conversationId;
+};
+
+const getParticipantRecord = async (
+  userId: string,
+  conversationId: string
+): Promise<Participants | null> => {
+  const result = await db
+    .select()
+    .from(schema.participants)
+    .where(
+      and(
+        eq(schema.participants.userId, userId),
+        eq(schema.participants.conversationId, conversationId)
+      )
+    )
+    .limit(1);
+  return result[0] ?? null;
 };
 
 describe(`Chat routes Integration Tests`, () => {
@@ -306,29 +349,6 @@ describe(`Chat routes Integration Tests`, () => {
   });
 
   describe('GET /conversations/:conversationId/messages', () => {
-    const createConv = async () => {
-      const response = await request(app)
-        .post(`${API_PREFIX}/conversations`)
-        .set('Authorization', `Bearer ${tokenUser1}`)
-        .send({ participantUserId: USER_ID_2 });
-
-      if (
-        response.status !== StatusCodes.CREATED &&
-        response.status !== StatusCodes.OK
-      ) {
-        throw new Error(
-          `Failed to create conversation in test helper, status: ${response.status}`
-        );
-      }
-      if (!response.body?.conversationId) {
-        throw new Error(
-          `Conversation ID missing from response body in test helper`
-        );
-      }
-
-      return response.body.conversationId;
-    };
-
     it('should return 401 Unauthorized if no token is provided', async () => {
       const convId = await createConv();
       const response = await request(app).get(
@@ -565,6 +585,160 @@ describe(`Chat routes Integration Tests`, () => {
       expect(response.status).toBe(StatusCodes.FORBIDDEN);
       expect(response.body.error[1]).toContain(
         'You are not a participant in this conversation'
+      );
+    });
+  });
+
+  describe('POST /conversations/:conversationId/read', () => {
+    it('should return 401 Unauthorized if no token is provided', async () => {
+      const convId = await createConv();
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .send({});
+
+      expect(response.status).toBe(StatusCodes.UNAUTHORIZED);
+    });
+
+    it('should return 422 Unprocessable Entity for invalid conversationId format', async () => {
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations/not-a-uuid/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({});
+
+      expect(response.status).toBe(StatusCodes.UNPROCESSABLE_ENTITY);
+      expect(response.body.error[1]).toContain(
+        '[params.conversationId]: Invalid UUID format'
+      );
+    });
+
+    it('should return 422 Unprocessable Entity for invalid timestamp format in body', async () => {
+      const convId = await createConv();
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ lastReadTimestamp: 'not-a-valid-timestamp' });
+
+      expect(response.status).toBe(StatusCodes.UNPROCESSABLE_ENTITY);
+      expect(response.body.error[1]).toContain(
+        '[body.lastReadTimestamp]: Invalid ISO 8601 timestamp format'
+      );
+    });
+
+    it('should return 403 Forbidden if user is not a participant', async () => {
+      const convId = await createConv();
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .set('Authorization', `Bearer ${tokenUser3}`)
+        .send({});
+
+      expect(response.status).toBe(StatusCodes.FORBIDDEN);
+      expect(response.body.error[1]).toContain(
+        'You are not a participant in this conversation'
+      );
+    });
+
+    it('should return 403 Forbidden if conversation does not exist', async () => {
+      const nonExistentId = randomUUID();
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations/${nonExistentId}/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({});
+
+      expect(response.status).toBe(StatusCodes.FORBIDDEN);
+      expect(response.body.error[1]).toContain(
+        'You are not a participant in this conversation'
+      );
+    });
+
+    it('should successfully mark conversation as read (implicit now) and return 200 OK', async () => {
+      const convId = await createConv();
+      const initialParticipant = await getParticipantRecord(USER_ID_1, convId);
+      expect(initialParticipant?.lastReadTimestamp).toBeNull();
+
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({});
+
+      expect(response.status).toBe(StatusCodes.OK);
+      expect(response.body.success).toBe(true);
+      expect(response.body).toHaveProperty('lastReadTimestamp');
+      const returnedTimestamp = new Date(response.body.lastReadTimestamp);
+      expect(Date.now() - returnedTimestamp.getTime()).toBeLessThan(5000);
+
+      const updatedParticipant = await getParticipantRecord(USER_ID_1, convId);
+      expect(updatedParticipant?.lastReadTimestamp).not.toBeNull();
+      expect(updatedParticipant?.lastReadTimestamp?.getTime()).toBe(
+        returnedTimestamp.getTime()
+      );
+    });
+
+    it('should successfully mark conversation as read with specific timestamp and return 200 OK', async () => {
+      const convId = await createConv();
+      const specificTimestamp = new Date(Date.now() - 60000);
+      const specificTimestampISO = specificTimestamp.toISOString();
+
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ lastReadTimestamp: specificTimestampISO });
+
+      expect(response.status).toBe(StatusCodes.OK);
+      expect(response.body.success).toBe(true);
+      expect(response.body.lastReadTimestamp).toBe(specificTimestampISO);
+
+      const updatedParticipant = await getParticipantRecord(USER_ID_1, convId);
+      expect(updatedParticipant?.lastReadTimestamp).not.toBeNull();
+      expect(updatedParticipant?.lastReadTimestamp?.toISOString()).toBe(
+        specificTimestampISO
+      );
+    });
+
+    it('should return 200 OK without updating if called again with older or same timestamp', async () => {
+      const convId = await createConv();
+      const firstTimestamp = new Date(Date.now() - 120000);
+      const firstTimestampISO = firstTimestamp.toISOString();
+
+      const firstResponse = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ lastReadTimestamp: firstTimestampISO });
+      expect(firstResponse.status).toBe(StatusCodes.OK);
+
+      const actualSetTimestampISO = firstResponse.body.lastReadTimestamp;
+      expect(actualSetTimestampISO).toBe(firstTimestampISO);
+
+      const responseSame = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ lastReadTimestamp: firstTimestampISO });
+
+      expect(responseSame.status).toBe(StatusCodes.OK);
+      expect(responseSame.body.lastReadTimestamp).toBe(actualSetTimestampISO);
+
+      const participantAfterSame = await getParticipantRecord(
+        USER_ID_1,
+        convId
+      );
+      expect(participantAfterSame?.lastReadTimestamp?.toISOString()).toBe(
+        actualSetTimestampISO
+      );
+
+      const olderTimestampISO = new Date(Date.now() - 300000).toISOString();
+      const responseOlder = await request(app)
+        .post(`${API_PREFIX}/conversations/${convId}/read`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ lastReadTimestamp: olderTimestampISO });
+
+      expect(responseOlder.status).toBe(StatusCodes.OK);
+      expect(responseOlder.body.lastReadTimestamp).toBe(actualSetTimestampISO);
+
+      const participantAfterOlder = await getParticipantRecord(
+        USER_ID_1,
+        convId
+      );
+      expect(participantAfterOlder?.lastReadTimestamp?.toISOString()).toBe(
+        actualSetTimestampISO
       );
     });
   });

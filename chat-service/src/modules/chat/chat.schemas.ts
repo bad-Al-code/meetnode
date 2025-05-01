@@ -58,18 +58,16 @@ export const markReadShema = z.object({
       'The ID of the conversation to mark as read'
     ),
   }),
-  body: z
-    .object({
-      lastReadTimestap: z
-        .string()
-        .datetime({
-          offset: true,
-          message: 'Invalid ISO 8061 timestamp format for "lastReadTimestamp"',
-        })
-        .optional()
-        .describe('Mark message up to this timestamp as read (defaults to now'),
-    })
-    .optional(),
+  body: z.object({
+    lastReadTimestap: z
+      .string()
+      .datetime({
+        offset: true,
+        message: 'Invalid ISO 8061 timestamp format for "lastReadTimestamp"',
+      })
+      .optional()
+      .describe('Mark message up to this timestamp as read (defaults to now'),
+  }),
 });
 
 export type MarkReadParams = z.infer<typeof markReadShema.shape.params>;
