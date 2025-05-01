@@ -3,7 +3,7 @@ import config from './config';
 import logger from './shared/utils/logger';
 import { app } from './app';
 import { closeDbConnection } from './db';
-import { initializeWebSocketServer } from './websockets/ws.server';
+import { initializeWebSocketServer } from './modules/websockets/websocket.server';
 
 const PORT = config.port;
 const httpServer = http.createServer(app);

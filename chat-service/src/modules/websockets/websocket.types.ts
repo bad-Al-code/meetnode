@@ -1,5 +1,5 @@
 import WebSocket from 'ws';
-import { UserId } from '../modules/chat/chat.types';
+import { UserId } from '../chat/chat.types';
 
 export interface AuthenticatedWebSocket extends WebSocket {
   isAlive?: boolean;
@@ -12,4 +12,9 @@ export interface BroadcastPayload {
   payload: any;
   senderUserId?: UserId;
   conversationId?: string;
+}
+
+export interface WebSocketOutgoingMessage<T = any> {
+  type: string;
+  payload?: T;
 }

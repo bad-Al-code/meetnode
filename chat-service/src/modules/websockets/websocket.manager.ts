@@ -1,6 +1,6 @@
-import { Participants, UserId } from '../modules/chat/chat.types';
-import { AuthenticatedWebSocket, BroadcastPayload } from './ws.types';
-import logger from '../shared/utils/logger';
+import { Participants, UserId } from '../chat/chat.types';
+import { AuthenticatedWebSocket, BroadcastPayload } from './websocket.types';
+import logger from '../../shared/utils/logger';
 
 class WebSocketManager {
   private readonly clients: Map<UserId, Set<AuthenticatedWebSocket>>;
@@ -44,7 +44,8 @@ class WebSocketManager {
   }
 
   isUserOnline(userId: UserId): boolean {
-    return this.clients.has(userId);
+    const connections = this.clients.get(userId);
+    return !!connections && connections.size > 0;
   }
 
   sendMessageToUser(userId: UserId, payload: BroadcastPayload): void {

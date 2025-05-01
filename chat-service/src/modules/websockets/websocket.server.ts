@@ -2,8 +2,9 @@ import { WebSocketServer } from 'ws';
 import { Server as HttpServer } from 'node:http';
 import { unknown } from 'zod';
 
-import { AuthenticatedWebSocket } from './ws.types';
-import logger from '../shared/utils/logger';
+import { AuthenticatedWebSocket } from './websocket.types';
+import logger from '../../shared/utils/logger';
+import { webSocketManager } from './websocket.manager';
 
 let wss: WebSocketServer | null = null;
 let heartbeatInterval: NodeJS.Timeout | null = null;
@@ -20,6 +21,7 @@ export const initializeWebSocketServer = (httpServer: HttpServer): void => {
       }
 
       ws.isAlive = false;
+      ws.ping(() => {});
     });
   }, 3000);
 
@@ -32,14 +34,50 @@ export const initializeWebSocketServer = (httpServer: HttpServer): void => {
 
     ws.isAlive = true;
     ws.isAuthenticated = false;
+
+    ws.on('pong', () => {
+      ws.isAlive = true;
+    });
+
+    ws.on('close', (code: number, reason: Buffer) => {
+      logger.info(
+        { userId: ws.userId, code, reason: reason.toString(), ip },
+        'WebSocket client disconnected'
+      );
+      webSocketManager.removeConnection(ws);
+      if (wss?.clients.size === 0 && heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
+    });
+
+    ws.on('error', (error: Error) => {
+      logger.error(
+        { userId: ws.userId, error: error.message, ip },
+        'WebSocket client error'
+      );
+      webSocketManager.removeConnection(ws);
+      if (
+        ws.readyState !== WebSocket.CLOSING &&
+        ws.readyState !== WebSocket.CLOSED
+      ) {
+        ws.terminate();
+      }
+    });
+
+    if (!heartbeatInterval && wss?.clients.size === 1) {
+      logger.info('First client connected, restarting heartbeat interval.');
+      heartbeatInterval = setInterval(() => {}, 30000);
+    }
   });
 
+  wss.on('error', (error: Error) => {
+    logger.error({ error: error.message }, 'WebSocket Server error');
+  });
   wss.on('close', () => {
     logger.info('WebSocket Server closed.');
-    if (heartbeatInterval) {
-      clearInterval(heartbeatInterval);
-      heartbeatInterval = null;
-    }
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
   });
 };
 
