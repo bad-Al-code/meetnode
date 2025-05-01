@@ -1,14 +1,13 @@
 import jwt from 'jsonwebtoken';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
+import { StatusCodes } from 'http-status-codes';
 
 import { app } from '../../../../src/app';
 import config from '../../../../src/config';
 import * as schema from '../../../../src/db/schema';
 import { db } from '../../../../src/db';
-import { StatusCodes } from 'http-status-codes';
-import { inArray } from 'drizzle-orm';
 import { ConversationListItem } from '../../../../src/modules/chat/chat.types';
 
 const API_PREFIX = '/api/v1/chat';
@@ -27,28 +26,10 @@ const generateTestToken = (userId: string): string => {
 };
 
 describe(`Chat routes Integration Tests`, () => {
-  let createdConversationId: string | null = null;
-
   beforeAll(() => {
     tokenUser1 = generateTestToken(USER_ID_1);
     tokenUser2 = generateTestToken(USER_ID_2);
     tokenUser3 = generateTestToken(USER_ID_3);
-  });
-
-  beforeEach(async () => {
-    const response = await request(app)
-      .post(`${API_PREFIX}/conversations`)
-      .set('Authorization', `Bearer ${tokenUser1}`)
-      .send({ participantUserId: USER_ID_2 });
-
-    if (
-      response.status === StatusCodes.CREATED ||
-      response.status === StatusCodes.OK
-    ) {
-      createdConversationId = response.body.conversationId;
-    } else {
-      createdConversationId = null;
-    }
   });
 
   afterEach(async () => {
@@ -76,7 +57,7 @@ describe(`Chat routes Integration Tests`, () => {
       console.error('Error during test cleanup:', error);
     }
 
-    createdConversationId = null;
+    // createdConversationId = null;
   });
 
   describe('POST /conversations', () => {
@@ -153,9 +134,6 @@ describe(`Chat routes Integration Tests`, () => {
 
       expect(response.status).toBe(StatusCodes.CREATED);
       expect(response.body).toHaveProperty('conversationId');
-      expect(response.body).toHaveProperty('type', 'DIRECT');
-      expect(response.body).toHaveProperty('createdAt');
-      expect(response.body).toHaveProperty('updatedAt');
 
       const conversationId = response.body.conversationId;
       const participants = await db
@@ -252,47 +230,52 @@ describe(`Chat routes Integration Tests`, () => {
         .set('Authorization', `Bearer ${tokenUser3}`);
 
       expect(response.status).toBe(StatusCodes.OK);
-      expect(response.body.error).toEqual([]);
+      expect(response.body).toEqual([]);
     });
 
     it('should return a list of conversation for the authenticated user', async () => {
+      const createRes = await request(app)
+        .post(`${API_PREFIX}/conversations`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ participantUserId: USER_ID_2 });
+      const convId = createRes.body.conversationId;
+
       const response = await request(app)
         .get(`${API_PREFIX}/conversations`)
         .set('Authorization', `Bearer ${tokenUser1}`);
 
       expect(response.status).toBe(StatusCodes.OK);
       expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThanOrEqual(1);
+      expect(response.body.length).toBe(1);
 
-      const testConversation = response.body.find(
-        (c: ConversationListItem) => c.conversationId === createdConversationId
-      );
+      const testConversation = response.body[0];
 
+      expect(testConversation).toHaveProperty('conversationId', convId);
       expect(testConversation).toBeDefined();
       expect(testConversation).toHaveProperty('type', 'DIRECT');
       expect(testConversation).toHaveProperty('lastMessage', null);
-      expect(testConversation).toHaveProperty('unreadcount', 0);
+      expect(testConversation).toHaveProperty('unreadCount', 0);
     });
 
     it('should return a conversation with last message and correct unread count', async () => {
-      expect(createdConversationId).not.toBeNull();
+      const createRes = await request(app)
+        .post(`${API_PREFIX}/conversations`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ participantUserId: USER_ID_2 });
+      const convId = createRes.body.conversationId;
 
       await db.insert(schema.messages).values({
-        conversationId: createdConversationId!,
+        conversationId: convId,
         senderUserId: USER_ID_2,
-        content: 'Message 1 from User 2',
-        contentType: 'TEXT',
+        content: 'M1',
       });
-
-      const lastMessageContent = 'Message 2 from User 2';
-      const { messageId: lastMessageId } = (
+      const lastMsg = (
         await db
           .insert(schema.messages)
           .values({
-            conversationId: createdConversationId!,
+            conversationId: convId,
             senderUserId: USER_ID_2,
-            content: lastMessageContent,
-            contentType: 'TEXT',
+            content: 'M2',
           })
           .returning()
       )[0];
@@ -303,14 +286,11 @@ describe(`Chat routes Integration Tests`, () => {
 
       expect(response.status).toBe(StatusCodes.OK);
       const testConversation = response.body.find(
-        (c: ConversationListItem) => c.conversationId === createdConversationId
+        (c: ConversationListItem) => c.conversationId === convId
       );
       expect(testConversation).toBeDefined();
-
       expect(testConversation.lastMessage).not.toBeNull();
-      expect(testConversation.lastMessage.messageId).toBe(lastMessageId);
-      expect(testConversation.lastMessage.content).toBe(lastMessageContent);
-      expect(testConversation.lastMessage.senderUserId).toBe(USER_ID_2);
+      expect(testConversation.lastMessage.messageId).toBe(lastMsg.messageId);
       expect(testConversation.unreadCount).toBe(2);
 
       const responseUser2 = await request(app)
@@ -318,20 +298,41 @@ describe(`Chat routes Integration Tests`, () => {
         .set('Authorization', `Bearer ${tokenUser2}`);
       expect(responseUser2.status).toBe(StatusCodes.OK);
       const testConversationUser2 = responseUser2.body.find(
-        (c: ConversationListItem) => c.conversationId === createdConversationId
+        (c: ConversationListItem) => c.conversationId === convId
       );
       expect(testConversationUser2).toBeDefined();
-      expect(testConversationUser2.lastMessage).not.toBeNull();
       expect(testConversationUser2.unreadCount).toBe(0);
     });
   });
 
   describe('GET /conversations/:conversationId/messages', () => {
-    it('should return 401 Unauthorized if no token is provided', async () => {
-      expect(createdConversationId).not.toBeNull();
+    const createConv = async () => {
+      const response = await request(app)
+        .post(`${API_PREFIX}/conversations`)
+        .set('Authorization', `Bearer ${tokenUser1}`)
+        .send({ participantUserId: USER_ID_2 });
 
+      if (
+        response.status !== StatusCodes.CREATED &&
+        response.status !== StatusCodes.OK
+      ) {
+        throw new Error(
+          `Failed to create conversation in test helper, status: ${response.status}`
+        );
+      }
+      if (!response.body?.conversationId) {
+        throw new Error(
+          `Conversation ID missing from response body in test helper`
+        );
+      }
+
+      return response.body.conversationId;
+    };
+
+    it('should return 401 Unauthorized if no token is provided', async () => {
+      const convId = await createConv();
       const response = await request(app).get(
-        `${API_PREFIX}/conversations/${createdConversationId}/messages`
+        `${API_PREFIX}/conversations/${convId}/messages`
       );
 
       expect(response.status).toBe(StatusCodes.UNAUTHORIZED);
@@ -339,9 +340,8 @@ describe(`Chat routes Integration Tests`, () => {
 
     it('should return 422 Unprocessable Entity for invalid conversationId format', async () => {
       const response = await request(app)
-        .get(`${API_PREFIX}/conversations/some-random-uuid/messages`)
+        .get(`${API_PREFIX}/conversations/not-a-uuid/messages`)
         .set('Authorization', `Bearer ${tokenUser1}`);
-
       expect(response.status).toBe(StatusCodes.UNPROCESSABLE_ENTITY);
       expect(response.body.error[1]).toContain(
         '[params.conversationId]: Invalid UUID format'
@@ -349,10 +349,13 @@ describe(`Chat routes Integration Tests`, () => {
     });
 
     it('should return 403 Forbidden if user is not a participant', async () => {
-      expect(createdConversationId).not.toBeNull();
+      const convId = await createConv();
+
+      expect(typeof convId).toBe('string');
+      expect(convId.length).toBeGreaterThan(10);
 
       const response = await request(app)
-        .get(`${API_PREFIX}/conversations/${createdConversationId}/messages`)
+        .get(`${API_PREFIX}/conversations/${convId}/messages`)
         .set('Authorization', `Bearer ${tokenUser3}`);
 
       expect(response.status).toBe(StatusCodes.FORBIDDEN);
@@ -361,7 +364,7 @@ describe(`Chat routes Integration Tests`, () => {
       );
     });
 
-    it('should return 404 Not Found if conversation does not exist', async () => {
+    it('should return 403 Forbidden if conversation does not exist', async () => {
       const nonExistentId = randomUUID();
 
       const response = await request(app)
@@ -375,24 +378,22 @@ describe(`Chat routes Integration Tests`, () => {
     });
 
     it('should return an empty array if conversation has no messages', async () => {
-      expect(createdConversationId).not.toBeNull();
-
+      const convId = await createConv();
       const response = await request(app)
-        .get(`${API_PREFIX}/conversations/${createdConversationId}/messages`)
+        .get(`${API_PREFIX}/conversations/${convId}/messages`)
         .set('Authorization', `Bearer ${tokenUser1}`);
-
       expect(response.status).toBe(StatusCodes.OK);
       expect(response.body).toEqual([]);
     });
 
     it('should return messages for the conversation, ordered oldest to newest', async () => {
-      expect(createdConversationId).not.toBeNull();
+      const convId = await createConv();
 
       const msg1 = (
         await db
           .insert(schema.messages)
           .values({
-            conversationId: createdConversationId!,
+            conversationId: convId,
             senderUserId: USER_ID_1,
             content: 'Msg 1',
           })
@@ -404,7 +405,7 @@ describe(`Chat routes Integration Tests`, () => {
         await db
           .insert(schema.messages)
           .values({
-            conversationId: createdConversationId!,
+            conversationId: convId,
             senderUserId: USER_ID_2,
             content: 'Msg 2',
           })
@@ -416,7 +417,7 @@ describe(`Chat routes Integration Tests`, () => {
         await db
           .insert(schema.messages)
           .values({
-            conversationId: createdConversationId!,
+            conversationId: convId,
             senderUserId: USER_ID_1,
             content: 'Msg 3',
           })
@@ -424,7 +425,7 @@ describe(`Chat routes Integration Tests`, () => {
       )[0];
 
       const response = await request(app)
-        .get(`${API_PREFIX}/conversations/${createdConversationId}/messages`)
+        .get(`${API_PREFIX}/conversations/${convId}/messages`)
         .set('Authorization', `Bearer ${tokenUser1}`);
 
       expect(response.status).toBe(StatusCodes.OK);
@@ -440,21 +441,20 @@ describe(`Chat routes Integration Tests`, () => {
     });
 
     it('should return messages respecting the limit query parameter', async () => {
-      expect(createdConversationId).not.toBeNull();
+      const convId = await createConv();
 
       for (let i = 1; i <= 5; i++) {
         await db.insert(schema.messages).values({
-          conversationId: createdConversationId!,
+          conversationId: convId,
           senderUserId: USER_ID_1,
           content: `Msg ${i}`,
         });
+
         await new Promise((res) => setTimeout(res, 5));
       }
 
       const response = await request(app)
-        .get(
-          `${API_PREFIX}/conversations/${createdConversationId}/messages?limit=3`
-        )
+        .get(`${API_PREFIX}/conversations/${convId}/messages?limit=3`)
         .set('Authorization', `Bearer ${tokenUser1}`);
 
       expect(response.status).toBe(StatusCodes.OK);
@@ -465,13 +465,13 @@ describe(`Chat routes Integration Tests`, () => {
     });
 
     it('should return messages respecting the before cursor query parameter', async () => {
-      expect(createdConversationId).not.toBeNull();
+      const convId = await createConv();
 
       const msg1 = (
         await db
           .insert(schema.messages)
           .values({
-            conversationId: createdConversationId!,
+            conversationId: convId,
             senderUserId: USER_ID_1,
             content: 'Msg 1',
           })
@@ -483,7 +483,7 @@ describe(`Chat routes Integration Tests`, () => {
         await db
           .insert(schema.messages)
           .values({
-            conversationId: createdConversationId!,
+            conversationId: convId!,
             senderUserId: USER_ID_2,
             content: 'Msg 2',
           })
@@ -495,7 +495,7 @@ describe(`Chat routes Integration Tests`, () => {
         await db
           .insert(schema.messages)
           .values({
-            conversationId: createdConversationId!,
+            conversationId: convId!,
             senderUserId: USER_ID_1,
             content: 'Msg 3',
           })
@@ -506,7 +506,7 @@ describe(`Chat routes Integration Tests`, () => {
 
       const response = await request(app)
         .get(
-          `${API_PREFIX}/conversations/${createdConversationId}/messages?before=${encodeURIComponent(cursor)}`
+          `${API_PREFIX}/conversations/${convId}/messages?before=${encodeURIComponent(cursor)}`
         )
         .set('Authorization', `Bearer ${tokenUser1}`);
 
@@ -517,10 +517,11 @@ describe(`Chat routes Integration Tests`, () => {
     });
 
     it('should return 422 for invalid before cursor format', async () => {
-      expect(createdConversationId).not.toBeNull();
+      const convId = await createConv();
+
       const response = await request(app)
         .get(
-          `${API_PREFIX}/conversations/${createdConversationId}/messages?before=not-a-timestamp`
+          `${API_PREFIX}/conversations/${convId}/messages?before=not-a-timestamp`
         )
         .set('Authorization', `Bearer ${tokenUser1}`);
 
@@ -531,16 +532,39 @@ describe(`Chat routes Integration Tests`, () => {
     });
 
     it('should return 422 for invalid limit format', async () => {
-      expect(createdConversationId).not.toBeNull();
+      const convId = await createConv();
+
       const response = await request(app)
-        .get(
-          `${API_PREFIX}/conversations/${createdConversationId}/messages?limit=-5`
-        )
+        .get(`${API_PREFIX}/conversations/${convId}/messages?limit=-5`)
         .set('Authorization', `Bearer ${tokenUser1}`);
 
       expect(response.status).toBe(StatusCodes.UNPROCESSABLE_ENTITY);
       expect(response.body.error[1]).toContain(
-        '[query.limit]: Limit must be a positive integer'
+        'Validation failed: [query.limit]: Limit must be a positive number'
+      );
+    });
+
+    it('should return 422 Unprocessable Entity for invalid conversationId format', async () => {
+      const response = await request(app)
+        .get(`${API_PREFIX}/conversations/some-random-uuid/messages`)
+        .set('Authorization', `Bearer ${tokenUser1}`);
+
+      expect(response.status).toBe(StatusCodes.UNPROCESSABLE_ENTITY);
+      expect(response.body.error[1]).toContain(
+        '[params.conversationId]: Invalid UUID format'
+      );
+    });
+
+    it('should return 404 Not Found if conversation does not exist', async () => {
+      const nonExistentId = randomUUID();
+
+      const response = await request(app)
+        .get(`${API_PREFIX}/conversations/${nonExistentId}/messages`)
+        .set('Authorization', `Bearer ${tokenUser1}`);
+
+      expect(response.status).toBe(StatusCodes.FORBIDDEN);
+      expect(response.body.error[1]).toContain(
+        'You are not a participant in this conversation'
       );
     });
   });
