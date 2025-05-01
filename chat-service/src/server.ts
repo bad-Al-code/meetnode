@@ -8,7 +8,7 @@ import { initializeWebSocketServer } from './modules/websockets/websocket.server
 const PORT = config.port;
 const httpServer = http.createServer(app);
 
-const shutdown = async (signal: string) => {
+const shutdown = async (_signal: string) => {
   let exitCode = 0;
 
   try {
@@ -17,7 +17,7 @@ const shutdown = async (signal: string) => {
     exitCode = 1;
   }
 
-  httpServer.close(async (err?: Error) => {
+  httpServer.close(async (_err?: Error) => {
     await closeDbConnection();
 
     process.exit(exitCode);

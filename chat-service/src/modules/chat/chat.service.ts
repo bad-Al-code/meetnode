@@ -107,7 +107,7 @@ export class ChatService {
 
     const conversation = await db.transaction(async (tx) => {
       await tx.query.conversations.findFirst({
-        where: (conversation, { eq, and, or }) =>
+        where: (conversation, { eq, and }) =>
           and(
             eq(conversation.type, 'DIRECT'),
             sql`EXISTS (SELECT 1 FROM ${schema.participants} p1 WHERE p1.conversation_id = ${conversation.conversationId} AND p1.user_id = ${initiatorUserId})`,

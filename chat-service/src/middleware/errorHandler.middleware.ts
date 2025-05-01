@@ -21,7 +21,7 @@ export const errorHandler = (
   err: Error | ApiError | ZodError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   let errorInstance: ApiError;
 

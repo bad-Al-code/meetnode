@@ -5,7 +5,7 @@ import { ValidationError } from '../shared/errors';
 
 export const validate =
   <T extends AnyZodObject>(schema: T) =>
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
       const dataToValidate = {
         params: req.params,

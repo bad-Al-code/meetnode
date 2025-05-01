@@ -4,7 +4,7 @@ import { authService } from '../modules/auth/auth.service';
 
 export const authenticatJWT = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   const authHeader = req.headers.authorization;

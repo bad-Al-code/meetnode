@@ -39,7 +39,7 @@ if (config.isDevelopment) {
   });
 }
 
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.status(StatusCodes.OK).json({
     status: 'UP',
     timestamp: new Date().toISOString(),
@@ -49,7 +49,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 app.use('/api/v1/chat', chatRouter);
 
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, _res: Response, next: NextFunction) => {
   const error = new NotFoundError(
     `Resource not found at ${req.method} ${req.originalUrl}`
   );

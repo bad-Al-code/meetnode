@@ -61,21 +61,27 @@ export class ChatRepository {
     const p2 = alias(schema.participants, 'p2');
 
     const result = await db
-      .selectDistinct({ conversation: schema.conversations })
+      .select({
+        conversationId: schema.conversations.conversationId,
+        type: schema.conversations.type,
+        createdAt: schema.conversations.createdAt,
+        updatedAt: schema.conversations.updatedAt,
+      })
       .from(schema.conversations)
-      .innerJoin(p1, eq(schema.conversations.conversationId, p2.conversationId))
+      .innerJoin(p1, eq(schema.conversations.conversationId, p1.conversationId))
       .innerJoin(p2, eq(schema.conversations.conversationId, p2.conversationId))
       .where(
         and(
           eq(schema.conversations.type, 'DIRECT'),
-          or(and(eq(p1.userId, userId1), eq(p2.userId, userId2))),
-          and(eq(p1.userId, userId2), eq(p2.userId, userId1)),
-          eq(p1.conversationId, p2.conversationId)
+          or(eq(p1.userId, userId1), eq(p1.userId, userId2)),
+          or(eq(p2.userId, userId1), eq(p2.userId, userId2)),
+          sql`${p1.userId} != ${p2.userId}`,
+          sql`(SELECT count(*) FROM ${schema.participants} WHERE ${schema.participants.conversationId} = ${schema.conversations.conversationId}) = 2`
         )
       )
       .limit(1);
 
-    return result[0]?.conversation ?? null;
+    return result[0] ?? null;
   }
 
   async findMessageByConversationId(
