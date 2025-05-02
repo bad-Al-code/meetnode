@@ -6,6 +6,9 @@ import express, {
   json,
   urlencoded,
 } from 'express';
+import swaggerui, { JsonObject } from 'swagger-ui-express';
+import path from 'node:path';
+import yaml from 'js-yaml';
 
 import config from './config';
 import logger from './shared/utils/logger';
@@ -13,6 +16,7 @@ import { StatusCodes } from 'http-status-codes';
 import { NotFoundError } from './shared/errors';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { chatRouter } from './modules/chat/chat.routes';
+import { readFileSync } from 'node:fs';
 
 const app: Express = express();
 
@@ -48,6 +52,22 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 app.use('/api/v1/chat', chatRouter);
+
+try {
+  const openApiPath = path.resolve(__dirname, '../docs/openapi.yml');
+  const swaggerDocument = yaml.load(readFileSync(openApiPath, 'utf8'));
+
+  app.use(
+    '/api-docs',
+    swaggerui.serve,
+    swaggerui.setup(swaggerDocument as JsonObject)
+  );
+} catch (error) {
+  logger.error(
+    { err: error },
+    'Failed to load or parse OpenaAPI document for swagger UI.'
+  );
+}
 
 app.use((req: Request, _res: Response, next: NextFunction) => {
   const error = new NotFoundError(
