@@ -202,31 +202,39 @@ export class ChatService {
   async markConversationAsRead(
     userId: UserId,
     conversationId: ConversationId,
-    readTimestamp?: Date | string
+    providedTimestamp?: string
   ): Promise<Participants> {
     const participant = await this.checkUserParticipation(
       userId,
       conversationId
     );
-    const timestampToUpdate = readTimestamp
-      ? new Date(readTimestamp)
+
+    const timestampToConsider = providedTimestamp
+      ? new Date(providedTimestamp)
       : new Date();
 
+    if (isNaN(timestampToConsider.getTime())) {
+      throw new BadRequestError('Invalid date format provided for timestamp.');
+    }
+
+    const currentLastRead = participant.lastReadTimestamp;
+
     if (
-      !participant.lastReadTimestamp ||
-      timestampToUpdate > participant.lastReadTimestamp
+      !currentLastRead ||
+      timestampToConsider.getTime() > currentLastRead.getTime()
     ) {
       const updatedParticipant =
         await this.chatRepository.updateParticipantReadTimestamp(
           participant.participantId,
-          timestampToUpdate
+          timestampToConsider
         );
 
       if (!updatedParticipant) {
         throw new InternalServerError(
-          `Failed to updated participant read timestamp.`
+          `Failed to update participant read timestamp for participantId: ${participant.participantId}`
         );
       }
+
       return updatedParticipant;
     } else {
       return participant;

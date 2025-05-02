@@ -52,23 +52,25 @@ export type CreateConversationBody = z.infer<
   typeof createConversationSchema.shape.body
 >;
 
-export const markReadShema = z.object({
-  params: z.object({
-    conversationId: uuidSchema.describe(
-      'The ID of the conversation to mark as read'
-    ),
-  }),
-  body: z.object({
-    lastReadTimestap: z
-      .string()
-      .datetime({
-        offset: true,
-        message: 'Invalid ISO 8061 timestamp format for "lastReadTimestamp"',
-      })
-      .optional()
-      .describe('Mark message up to this timestamp as read (defaults to now'),
-  }),
-});
+export const markReadShema = z
+  .object({
+    params: z.object({
+      conversationId: uuidSchema.describe(
+        'The ID of the conversation to mark as read'
+      ),
+    }),
+    body: z.object({
+      lastReadTimestamp: z
+        .string()
+        .datetime({
+          offset: true,
+          message: 'Invalid ISO 8601 timestamp format for "lastReadTimestamp"',
+        })
+        .optional()
+        .describe('Mark message up to this timestamp as read (defaults to now'),
+    }),
+  })
+  .strict();
 
 export type MarkReadParams = z.infer<typeof markReadShema.shape.params>;
 export type MarkReadBody = z.infer<typeof markReadShema.shape.body>;

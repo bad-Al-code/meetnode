@@ -70,7 +70,7 @@ export class ChatController {
     const body = req.validatedData?.query as MarkReadBody;
 
     const { conversationId } = params;
-    const timestamp = body?.lastReadTimestap;
+    const timestamp = body?.lastReadTimestamp;
 
     const updatedParticipant = await this.chatService.markConversationAsRead(
       userId,
