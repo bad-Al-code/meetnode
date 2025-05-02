@@ -18,6 +18,20 @@ USER nodejs
 COPY --chown=nodejs:nodejs --from=builder /usr/src/app/package.json ./package.json
 COPY --chown=nodejs:nodejs --from=builder /usr/src/app/node_modules ./node_modules
 COPY --chown=nodejs:nodejs --from=builder /usr/src/app/dist ./dist
+
+RUN find /usr/src/app/node_modules -type f -name '*.js.map' -delete || true && \
+    find /usr/src/app/node_modules -type f -name '*.ts' -delete || true && \
+    find /usr/src/app/node_modules -type f -name '*.d.ts' -delete || true && \
+    find /usr/src/app/node_modules -type d -name 'test' -exec rm -rf {} + || true && \
+    find /usr/src/app/node_modules -type d -name 'tests' -exec rm -rf {} + || true && \
+    find /usr/src/app/node_modules -type d -name 'doc' -exec rm -rf {} + || true && \
+    find /usr/src/app/node_modules -type d -name 'docs' -exec rm -rf {} + || true && \
+    find /usr/src/app/node_modules -type d -name 'examples' -exec rm -rf {} + || true && \
+    find /usr/src/app/node_modules -type f -name '*.md' -delete || true && \
+    find /usr/src/app/node_modules -type f -name 'LICENSE*' -delete || true && \
+    echo "Cleaned up node_modules"
+
+USER nodejs
 EXPOSE ${PORT}
 
 CMD ["node", "dist/server.js"]
