@@ -12,7 +12,6 @@ import yaml from 'js-yaml';
 
 import config from './config';
 import logger from './shared/utils/logger';
-import { StatusCodes } from 'http-status-codes';
 import { NotFoundError } from './shared/errors';
 import { errorHandler } from './middleware/errorHandler.middleware';
 import { chatRouter } from './modules/chat/chat.routes';
@@ -42,14 +41,6 @@ if (config.isDevelopment) {
     next();
   });
 }
-
-app.get('/health', (_req: Request, res: Response) => {
-  res.status(StatusCodes.OK).json({
-    status: 'UP',
-    timestamp: new Date().toISOString(),
-    service: 'chat-service',
-  });
-});
 
 app.use('/api/v1/chat', chatRouter);
 
