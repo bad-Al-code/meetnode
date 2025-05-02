@@ -18,6 +18,7 @@ USER nodejs
 COPY --chown=nodejs:nodejs --from=builder /usr/src/app/package.json ./package.json
 COPY --chown=nodejs:nodejs --from=builder /usr/src/app/node_modules ./node_modules
 COPY --chown=nodejs:nodejs --from=builder /usr/src/app/dist ./dist
+COPY --chown=nodejs:nodejs --from=builder /usr/src/app/docs ./docs
 
 RUN find /usr/src/app/node_modules -type f -name '*.js.map' -delete || true && \
     find /usr/src/app/node_modules -type f -name '*.ts' -delete || true && \
