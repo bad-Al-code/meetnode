@@ -1,31 +1,43 @@
+// src/app/room/[roomId]/page.tsx
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { io, Socket } from "socket.io-client"; // Import Socket
 
 interface RoomPageProps {
   params: { roomId: string };
 }
 
+// Keep a reference to the socket outside the component to prevent
+// re-connections on re-renders if it's not managed by state/effect.
+// Or better, manage it with useState and useEffect for proper lifecycle.
+// let socket: Socket | null = null; // Old approach, see below for better one
+
 export default function RoomPage({ params }: RoomPageProps) {
   const { roomId } = params;
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const mainVideoRef = useRef<HTMLVideoElement>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null); // Manage socket with state
 
+  // Effect for initializing local media
   useEffect(() => {
     const startLocalMedia = async () => {
       try {
-        // Request video and audio
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
-          audio: true, // Request audio, but we'll mute the local video element initially
+          audio: true,
         });
         setLocalStream(stream);
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = stream;
         }
+        if (mainVideoRef.current) {
+          // Initially show local stream in main view
+          mainVideoRef.current.srcObject = stream;
+        }
       } catch (error) {
         console.error("Error accessing media devices.", error);
-        // Handle error (e.g., show a message to the user)
         alert(
           `Error accessing media devices: ${
             error instanceof Error ? error.message : String(error)
@@ -33,27 +45,46 @@ export default function RoomPage({ params }: RoomPageProps) {
         );
       }
     };
-
     startLocalMedia();
 
-    // Cleanup function
     return () => {
       localStream?.getTracks().forEach((track) => track.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run once on component mount
+  }, []); // Empty dependency array: runs once on mount
 
-  // For the main video, let's assume it's also the local video for now
-  const mainVideoRef = useRef<HTMLVideoElement>(null);
+  // Effect for initializing and cleaning up socket connection
   useEffect(() => {
-    if (localStream && mainVideoRef.current) {
-      mainVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
+    // Initialize socket connection
+    // The path MUST match the one in pages/api/socket.ts
+    const newSocket = io({ path: "/api/socket_io" });
+    setSocket(newSocket);
 
+    newSocket.on("connect", () => {
+      console.log("Connected to Socket.IO server, client ID:", newSocket.id);
+      // Client can now emit a 'join-room' event, for example
+      // newSocket.emit('join-room', roomId, newSocket.id); // We'll do this in the next step
+    });
+
+    newSocket.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+    });
+
+    newSocket.on("disconnect", (reason) => {
+      console.log("Disconnected from Socket.IO server:", reason);
+    });
+
+    // Cleanup function for when the component unmounts or socket changes
+    return () => {
+      console.log("Cleaning up socket connection...");
+      newSocket.disconnect();
+    };
+  }, [roomId]); // Re-run if roomId changes, though typically it won't in a single session
+
+  // ... rest of the component (JSX) remains the same for now ...
   return (
     <div className="flex h-screen flex-col bg-gray-900 text-white">
-      {/* Header ... (keep as is for now) */}
+      {/* Header */}
       <header className="flex items-center justify-between p-4 border-b border-gray-700">
         <div className="flex items-center">
           <div className="w-8 h-8 bg-orange-500 rounded-md mr-3 flex items-center justify-center font-bold text-sm">
@@ -67,7 +98,10 @@ export default function RoomPage({ params }: RoomPageProps) {
           </div>
         </div>
         <div className="flex items-center">
-          <span className="mr-2 text-sm">Badal, al (You)</span>
+          <span className="mr-2 text-sm">
+            Badal, al (You){" "}
+            {socket?.id && `(SID: ${socket.id.substring(0, 5)})`}
+          </span>
           <button className="bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-md text-sm font-medium flex items-center">
             <span className="w-2 h-2 bg-white rounded-full mr-1.5"></span>
             REC
@@ -80,31 +114,29 @@ export default function RoomPage({ params }: RoomPageProps) {
       <main className="flex flex-1 p-4 gap-4 overflow-hidden">
         {/* Main Video Player */}
         <section className="flex-1 flex flex-col bg-black rounded-lg overflow-hidden relative">
-          {/* Use a video element here */}
           <video
             ref={mainVideoRef}
             autoPlay
-            playsInline // Important for mobile browsers
-            muted // Mute local video to prevent echo initially
+            playsInline
+            muted
             className="w-full h-full object-cover"
           />
           <div className="absolute top-2 right-2 bg-red-500 p-1 rounded-full text-xs">
-            🔇 {/* This should reflect actual mute state later */}
+            🔇
           </div>
           <div className="absolute bottom-2 left-2 bg-gray-700 px-2 py-1 rounded-md text-xs">
-            Badal, al (You) {/* Or current main speaker */}
+            Badal, al (You)
           </div>
         </section>
 
         {/* Participant Thumbnails */}
         <aside className="w-1/5 min-w-[200px] flex flex-col gap-2 overflow-y-auto">
-          {/* My Video */}
           <div className="aspect-video bg-gray-700 rounded-md flex items-center justify-center relative overflow-hidden">
             <video
               ref={localVideoRef}
               autoPlay
               playsInline
-              muted // Local preview should always be muted
+              muted
               className="w-full h-full object-cover"
             />
             <span className="absolute bottom-1 left-1 bg-black bg-opacity-75 px-1.5 py-0.5 rounded text-xs">
@@ -114,8 +146,6 @@ export default function RoomPage({ params }: RoomPageProps) {
               🔇
             </div>
           </div>
-          {/* Other Participant 1 (placeholder) ... */}
-          {/* ... keep other static placeholders for now ... */}
           <div className="aspect-video bg-gray-700 rounded-md flex items-center justify-center relative">
             <span className="text-xs">Participant 2 (asd)</span>
             <div className="absolute top-1 right-1 bg-black bg-opacity-50 p-0.5 rounded-full text-xs">
@@ -136,7 +166,7 @@ export default function RoomPage({ params }: RoomPageProps) {
         </aside>
       </main>
 
-      {/* Controls Footer ... (keep as is for now) */}
+      {/* Controls Footer */}
       <footer className="flex items-center justify-between p-3 border-t border-gray-700">
         <div className="flex gap-2">
           <button className="bg-red-500 p-3 rounded-lg">🎤 Mute</button>
