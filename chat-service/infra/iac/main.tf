@@ -91,6 +91,13 @@ resource "kubernetes_deployment" "postgres_deployment" {
             mount_path = "/var/lib/postgresql/data"
           }
         }
+
+        volume {
+          name = "postgres-storage"
+          persistent_volume_claim {
+            claim_name = kubernetes_persistent_volume_claim.postgres_pvc.metadata[0].name
+          }
+        }
       }
     }
   }
