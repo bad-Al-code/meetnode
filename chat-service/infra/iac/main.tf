@@ -95,3 +95,22 @@ resource "kubernetes_deployment" "postgres_deployment" {
     }
   }
 }
+
+resource "kubernetes_service" "postgres_svc" {
+  metadata {
+    name = "ppstgres-svc"
+  }
+  spec {
+    selector = {
+      app = "postgres"
+    }
+
+    port{
+      protocol = "TCP"
+      port = 5432
+      target_port =  = 5432
+    }
+
+    type = "ClusterIP"
+  }
+}
