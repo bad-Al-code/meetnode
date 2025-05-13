@@ -37,3 +37,61 @@ resource "kubernetes_persistent_volume_claim" "postgres_pvc" {
     storage_class_name = "standard"
   }
 }
+
+resource "kubernetes_deployment" "postgres_deployment" {
+  metadata {
+    name = "postgres-deployment"
+  }
+  spec {
+    replicas = 1
+    selector {
+      match_labels = {
+        app = "postgres"
+      }
+    }
+    template {
+      metadata {
+        labels = {
+          app = "postgres"
+        }
+      }
+      spec {
+        container {
+          name              = "postgres"
+          image             = "postgres:16.8-alpine3.20"
+          image_pull_policy = "IfNotPresent"
+
+          port {
+            container_port = 5432
+          }
+
+          env {
+            name  = "POSTGRES_DB"
+            value = "meetnote_chat_k8s"
+          }
+
+          env {
+            name  = "POSTGRES_USER"
+            value = "meetnote_user"
+          }
+
+
+          env {
+            name = "POSTGRES_PASSWORD"
+            value_from {
+              secret_key_ref {
+                name = kubernetes_secret.postgres-secret.metadata[0].name
+                key  = "postgres-password"
+              }
+            }
+          }
+
+          volume_mount {
+            name       = "postgres-storage"
+            mount_path = "/var/lib/postgresql/data"
+          }
+        }
+      }
+    }
+  }
+}
