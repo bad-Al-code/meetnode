@@ -21,3 +21,19 @@ resource "kubernetes_secret" "postgres-secret" {
     "postgres-password" : "YzM5ZmFjN2YtM2VlYi00NjlmLTk0NmMtYTNlOTQ3ODA5Njc3"
   }
 }
+
+resource "kubernetes_persistent_volume_claim" "postgres_pvc" {
+  metadata {
+    name = "postgres-pvc"
+  }
+  spec {
+    access_modes = ["ReadWriteOnce"]
+    resources {
+      requests = {
+        "storage" = "1Gi"
+      }
+    }
+
+    storage_class_name = "standard"
+  }
+}
