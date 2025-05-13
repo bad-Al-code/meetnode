@@ -12,112 +12,17 @@ provider "kubernetes" {
   config_context = "minikube"
 }
 
-resource "kubernetes_secret" "postgres-secret" {
-  metadata {
-    name = "postgres-secret"
-  }
-  type = "Opaque"
-  data = {
-    "postgres-password" : "YzM5ZmFjN2YtM2VlYi00NjlmLTk0NmMtYTNlOTQ3ODA5Njc3"
-  }
-}
+module "user_service_postgres_db" {
+  source                = "./modules/postgresql"
+  instance_name         = var.user_service_pg_instance_name
+  k8s_namespace         = var.default_namespace
+  postgres_db_name      = var.user_service_pg_db_name
+  postgres_user         = var.user_service_pg_user
+  postgres_password_b64 = var.user_service_pg_password_b64
+  pvc_storage_size      = var.user_service_pg_pvc_storage_size
 
-resource "kubernetes_persistent_volume_claim" "postgres_pvc" {
-  metadata {
-    name = "postgres-pvc"
-  }
-  spec {
-    access_modes = ["ReadWriteOnce"]
-    resources {
-      requests = {
-        "storage" = "1Gi"
-      }
-    }
-
-    storage_class_name = "standard"
-  }
-}
-
-resource "kubernetes_deployment" "postgres_deployment" {
-  metadata {
-    name = "postgres-deployment"
-  }
-  spec {
-    replicas = 1
-    selector {
-      match_labels = {
-        app = "postgres"
-      }
-    }
-    template {
-      metadata {
-        labels = {
-          app = "postgres"
-        }
-      }
-      spec {
-        container {
-          name              = "postgres"
-          image             = "postgres:16.8-alpine3.20"
-          image_pull_policy = "IfNotPresent"
-
-          port {
-            container_port = 5432
-          }
-
-          env {
-            name  = "POSTGRES_DB"
-            value = "meetnote_chat_k8s"
-          }
-
-          env {
-            name  = "POSTGRES_USER"
-            value = "meetnote_user"
-          }
-
-
-          env {
-            name = "POSTGRES_PASSWORD"
-            value_from {
-              secret_key_ref {
-                name = kubernetes_secret.postgres-secret.metadata[0].name
-                key  = "postgres-password"
-              }
-            }
-          }
-
-          volume_mount {
-            name       = "postgres-storage"
-            mount_path = "/var/lib/postgresql/data"
-          }
-        }
-
-        volume {
-          name = "postgres-storage"
-          persistent_volume_claim {
-            claim_name = kubernetes_persistent_volume_claim.postgres_pvc.metadata[0].name
-          }
-        }
-      }
-    }
-  }
-}
-
-resource "kubernetes_service" "postgres_svc" {
-  metadata {
-    name = "postgres-svc"
-  }
-  spec {
-    selector = {
-      app = "postgres"
-    }
-
-    port {
-      protocol    = "TCP"
-      port        = 5432
-      target_port = 5432
-    }
-
-    type = "ClusterIP"
+  app_labels = {
+    "app.kyubernetes.io/part-of" = "user-service"
+    "environment"                = var.environment
   }
 }
