@@ -98,17 +98,17 @@ resource "kubernetes_deployment" "postgres_deployment" {
 
 resource "kubernetes_service" "postgres_svc" {
   metadata {
-    name = "ppstgres-svc"
+    name = "p0stgres-svc"
   }
   spec {
     selector = {
       app = "postgres"
     }
 
-    port{
-      protocol = "TCP"
-      port = 5432
-      target_port =  = 5432
+    port {
+      protocol    = "TCP"
+      port        = 5432
+      target_port = 5432
     }
 
     type = "ClusterIP"
