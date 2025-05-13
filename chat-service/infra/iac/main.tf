@@ -105,7 +105,7 @@ resource "kubernetes_deployment" "postgres_deployment" {
 
 resource "kubernetes_service" "postgres_svc" {
   metadata {
-    name = "p0stgres-svc"
+    name = "postgres-svc"
   }
   spec {
     selector = {
