@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
+import { StatusCodes } from "http-status-codes";
 
 import * as authService from "../services/auth.service";
 import { InitiateEmailOtpInput } from "../schemas/auth.schema";
 import { env } from "../config";
-import { StatusCodes } from "http-status-codes";
 
 export const initiateEmailOtpHandler = async (
   req: Request<{}, {}, InitiateEmailOtpInput>,
@@ -11,12 +11,13 @@ export const initiateEmailOtpHandler = async (
   next: NextFunction
 ) => {
   try {
-    const result = await authService.initiateEmailOtp(req.body);
+    const serviceResponse = await authService.initiateEmailOtp(req.body);
+    const responsePayload: { message: string; otp_for_testing?: string } = {
+      message: serviceResponse.message,
+    };
 
-    // TEST
-    const responsePayload: any = { message: result.message };
-    if (env.NODE_ENV === "development" && result.otp) {
-      responsePayload.otp_for_testing = result.otp;
+    if (env.NODE_ENV === "development" && serviceResponse.otp_for_testing) {
+      responsePayload.otp_for_testing = serviceResponse.otp_for_testing;
     }
 
     res.status(StatusCodes.OK).json(responsePayload);
