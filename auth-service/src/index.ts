@@ -11,6 +11,7 @@ import { StatusCodes } from "http-status-codes";
 import { env } from "./config";
 import { logger } from "./utils/logger";
 import { BaseError } from "./utils/errors";
+import { authRouter } from "./routes/auth.routes";
 
 const PORT: number = env.PORT;
 const NODE_ENV = env.NODE_ENV;
@@ -18,6 +19,8 @@ const NODE_ENV = env.NODE_ENV;
 const app: Application = express();
 
 app.use(json());
+
+app.use("/api/v1/auth", authRouter);
 
 app.get("/health", (req: Request, res: Response) => {
   logger.info("Health check endpoint was called");
