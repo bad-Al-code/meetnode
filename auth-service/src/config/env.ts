@@ -13,6 +13,9 @@ const envSchema = z.object({
   OTP_REDIS_PREFIX: z
     .string()
     .min(1, { message: "OTP_REDIS_PREFIX is required" }),
+  OTP_VERIFY_ATTEMPTS_PREFIX: z
+    .string()
+    .min(1, { message: "OTP_VERIFY_ATTEMPTS_PREFIX is required" }),
 
   OTP_EXPIRY_SECONDS: z.coerce.number().positive().int().default(300),
   OTP_MAX_VERIFY_ATTEMPTS: z.coerce.number().positive().int().default(5),

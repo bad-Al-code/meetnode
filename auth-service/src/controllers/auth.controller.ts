@@ -2,7 +2,10 @@ import { Request, Response, NextFunction } from "express";
 import { StatusCodes } from "http-status-codes";
 
 import * as authService from "../services/auth.service";
-import { InitiateEmailOtpInput } from "../schemas/auth.schema";
+import {
+  InitiateEmailOtpInput,
+  VerifyEmailOtpInput,
+} from "../schemas/auth.schema";
 import { env } from "../config";
 
 export const initiateEmailOtpHandler = async (
@@ -21,6 +24,21 @@ export const initiateEmailOtpHandler = async (
     }
 
     res.status(StatusCodes.OK).json(responsePayload);
+    return;
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyEmailOtpHandler = async (
+  req: Request<{}, {}, VerifyEmailOtpInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const serviceResponse = await authService.verifyEmailOtp(req.body);
+
+    res.status(StatusCodes.OK).json(serviceResponse);
     return;
   } catch (error) {
     next(error);
