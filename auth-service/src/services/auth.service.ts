@@ -5,6 +5,7 @@ import {
   VerifyEmailOtpInput,
 } from "../schemas/auth.schema";
 import { BadRequestError, NotFoundError } from "../utils/errors";
+import { JwtPayload, signJWT } from "../utils/jwt";
 import { logger } from "../utils/logger";
 
 export const initiateEmailOtp = async (
@@ -46,7 +47,7 @@ export const initiateEmailOtp = async (
 
 export const verifyEmailOtp = async (
   input: VerifyEmailOtpInput
-): Promise<{ message: string; token?: string }> => {
+): Promise<{ message: string; accessToken?: string }> => {
   const { email, otp: providedOtp } = input;
   const otpKey = `${env.OTP_REDIS_PREFIX}${email}`;
   const attemptsKey = `${env.OTP_VERIFY_ATTEMPTS_PREFIX}${email}`;
@@ -104,6 +105,14 @@ export const verifyEmailOtp = async (
   // TODO: check if user exists
   // TODO: if user does not exits, create them
   // TODO: Generate JWT
+  const simulateUserId = `user_${Date.now()}`;
+  const jwtPayload: JwtPayload = {
+    userId: simulateUserId,
+    email,
+  };
 
-  return { message: "OTP verified successfully." };
+  const accessToken = signJWT(jwtPayload);
+  logger.info(`Access token generated for user: ${email}`);
+
+  return { message: "OTP verified successfully.", accessToken };
 };

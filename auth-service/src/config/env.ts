@@ -19,6 +19,11 @@ const envSchema = z.object({
 
   OTP_EXPIRY_SECONDS: z.coerce.number().positive().int().default(300),
   OTP_MAX_VERIFY_ATTEMPTS: z.coerce.number().positive().int().default(5),
+
+  JWT_SECRET: z
+    .string()
+    .min(32, { message: "JWT_SECRET must be at least 32 characters long" }),
+  JWT_EXPIRES_IN: z.coerce.number().positive().int().default(3600),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
