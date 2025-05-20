@@ -10,7 +10,7 @@ import { StatusCodes } from "http-status-codes";
 
 import { env } from "./config";
 import { logger } from "./utils/logger";
-import { BaseError } from "./utils/errors";
+import { BaseError, NotFoundError } from "./utils/errors";
 import { authRouter } from "./routes/auth.routes";
 
 const PORT: number = env.PORT;
@@ -30,6 +30,14 @@ app.get("/health", (req: Request, res: Response) => {
     .send(`Auth service is healthy! Running in ${NODE_ENV} mode}`);
 });
 
+app.use((req: Request, res: Response, next: NextFunction) => {
+  next(
+    new NotFoundError(
+      `This requested URL ${req.originalUrl} was not found on this server.`
+    )
+  );
+});
+
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   if (err instanceof BaseError) {
     logger.warn(`Operational Error: ${err.name} - ${err.message}`, {
@@ -40,6 +48,23 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 
       ...(env.NODE_ENV === "development" && { stack: err.stack }),
     });
+
+    const responseBody: {
+      status: string;
+      message: string;
+      details?: unknown;
+    } = {
+      status: "error",
+      message: err.message,
+    };
+
+    if (err.details) {
+      responseBody.details = err.details;
+    }
+
+    res.status(err.statusCode).json(responseBody);
+
+    return;
   }
 
   logger.error(`Unhandled/System Error: ${err.message}`, {
