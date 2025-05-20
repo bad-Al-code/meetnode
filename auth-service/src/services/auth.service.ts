@@ -8,7 +8,7 @@ export const initiateEmailOtp = async (
 
   // TODO: check if user exists
 
-  const otp = Math.floor(100000 + Math.random() + 900000).toString();
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
   logger.debug(`OTP for ${email}: ${otp}`);
 
   // TODO: store otp (redis with expiry)
