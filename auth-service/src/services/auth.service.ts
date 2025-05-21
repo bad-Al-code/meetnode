@@ -1,12 +1,28 @@
+import { randomBytes } from "node:crypto";
 import { env } from "../config";
 import { redisClient } from "../config/redisClient";
 import {
   InitiateEmailOtpInput,
+  RefreshTokenInput,
   VerifyEmailOtpInput,
 } from "../schemas/auth.schema";
-import { BadRequestError, NotFoundError } from "../utils/errors";
-import { JwtPayload, signJWT } from "../utils/jwt";
+import {
+  AuthenticationError,
+  BadRequestError,
+  BaseError,
+  NotFoundError,
+} from "../utils/errors";
+import {
+  AccessTokenPayload,
+  RefreshTokenPayload,
+  signAccessToken,
+  signRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
+} from "../utils/jwt";
 import { logger } from "../utils/logger";
+import { userInfo } from "node:os";
+import { StatusCodes } from "http-status-codes";
 
 export const initiateEmailOtp = async (
   input: InitiateEmailOtpInput
@@ -47,7 +63,7 @@ export const initiateEmailOtp = async (
 
 export const verifyEmailOtp = async (
   input: VerifyEmailOtpInput
-): Promise<{ message: string; accessToken?: string }> => {
+): Promise<{ message: string; accessToken: string; refreshToken: string }> => {
   const { email, otp: providedOtp } = input;
   const otpKey = `${env.OTP_REDIS_PREFIX}${email}`;
   const attemptsKey = `${env.OTP_VERIFY_ATTEMPTS_PREFIX}${email}`;
@@ -105,14 +121,77 @@ export const verifyEmailOtp = async (
   // TODO: check if user exists
   // TODO: if user does not exits, create them
   // TODO: Generate JWT
-  const simulateUserId = `user_${Date.now()}`;
-  const jwtPayload: JwtPayload = {
+  const simulateUserId = `user_${randomBytes(8).toString("hex")}`;
+  const accessTokenPayload: Omit<AccessTokenPayload, "type"> = {
     userId: simulateUserId,
     email,
   };
 
-  const accessToken = signJWT(jwtPayload);
-  logger.info(`Access token generated for user: ${email}`);
+  const accessToken = signAccessToken(accessTokenPayload);
+  const refreshTokenId = randomBytes(16).toString("hex");
+  const refreshTokenPayload: Omit<RefreshTokenPayload, "type" | "tokenId"> & {
+    tokenId: string;
+  } = {
+    userId: simulateUserId,
+    tokenId: refreshTokenId,
+  };
 
-  return { message: "OTP verified successfully.", accessToken };
+  const refreshToken = signRefreshToken(refreshTokenPayload);
+
+  const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${simulateUserId}:${refreshTokenId}`;
+
+  try {
+    await redisClient.set(
+      refreshTokenKey,
+      "active",
+      "EX",
+      env.JWT_REFRESH_EXPIRES_IN
+    );
+  } catch (error) {
+    throw new BaseError(
+      `TokenStorageError`,
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      "Failed to store refresh token session."
+    );
+  }
+
+  return {
+    message: "OTP verified successfully. Logged in.",
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const refreshAccesstoken = async (
+  input: RefreshTokenInput
+): Promise<{ accessToken: string }> => {
+  const { refreshToken: providedRefreshToken } = input;
+  const decodedPayload = verifyRefreshToken(providedRefreshToken);
+
+  if (!decodedPayload || !decodedPayload.tokenId) {
+    throw new AuthenticationError("Invalid or expired refresh token");
+  }
+
+  const { userId, tokenId } = decodedPayload;
+  const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${userId}:${tokenId}`;
+  const storedTokenState = await redisClient.get(refreshTokenKey);
+
+  if (!storedTokenState || storedTokenState !== "active") {
+    logger.warn(
+      `Refresh token not found in redis or inactive for user ${userId}, tokenId: ${tokenId}. Possible resuse or revocation.`
+    );
+
+    throw new AuthenticationError(
+      "Refresh token is invalid, expired or has be revoked."
+    );
+  }
+
+  const accessTokenPayload: Omit<AccessTokenPayload, "type"> = {
+    userId,
+    email: "test@test.com",
+  };
+
+  const newAccessToken = signAccessToken(accessTokenPayload);
+
+  return { accessToken: newAccessToken };
 };

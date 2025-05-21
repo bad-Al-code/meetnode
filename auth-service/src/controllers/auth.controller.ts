@@ -4,6 +4,7 @@ import { StatusCodes } from "http-status-codes";
 import * as authService from "../services/auth.service";
 import {
   InitiateEmailOtpInput,
+  RefreshTokenInput,
   VerifyEmailOtpInput,
 } from "../schemas/auth.schema";
 import { env } from "../config";
@@ -39,6 +40,22 @@ export const verifyEmailOtpHandler = async (
     const serviceResponse = await authService.verifyEmailOtp(req.body);
 
     res.status(StatusCodes.OK).json(serviceResponse);
+    return;
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refreshAccesstokenHandler = async (
+  req: Request<{}, {}, RefreshTokenInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { refreshToken } = req.body;
+    const result = await authService.refreshAccesstoken({ refreshToken });
+
+    res.status(StatusCodes.OK).json(result);
     return;
   } catch (error) {
     next(error);

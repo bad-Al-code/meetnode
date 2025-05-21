@@ -21,3 +21,11 @@ export const verifyEmailOtpSchema = z.object({
 });
 
 export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>["body"];
+
+export const refreshTokenSchema = z.object({
+  body: z.object({
+    refreshToken: z.string({ required_error: "Refresh token is required" }),
+  }),
+});
+
+export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>["body"];
