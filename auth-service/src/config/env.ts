@@ -19,6 +19,9 @@ const envSchema = z.object({
   REFRESH_TOKEN_REDIS_PREFIX: z
     .string()
     .min(1, { message: "REFRESH_TOKEN_REDIS_PREFIX is required" }),
+  GOOGLE_USER_ID_PREFIX: z
+    .string()
+    .min(1, { message: "GOOGLE_USER_ID_PREFIX s=is required" }),
 
   OTP_EXPIRY_SECONDS: z.coerce.number().positive().int().default(300),
   OTP_MAX_VERIFY_ATTEMPTS: z.coerce.number().positive().int().default(5),

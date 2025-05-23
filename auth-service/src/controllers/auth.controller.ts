@@ -80,15 +80,38 @@ export const googleOAuthCallbackHandler = async (
       return;
     }
 
-    const result = { message: "Google OAuth callback received. Processing..." };
+    if (typeof code !== "string") {
+      next(
+        new AuthenticationError(
+          "Google OAuth failed: Invalid authorization code provided"
+        )
+      );
+      return;
+    }
+
+    const { accessToken, refreshToken, newAccount } =
+      await authService.handleGoogleOAuthCallback(code);
+
     const frontendRedirectUrl = new URL(env.FRONTEND_REDIRECT_URI);
-    frontendRedirectUrl.searchParams.append("status", "success");
+    frontendRedirectUrl.searchParams.append("accessToken", accessToken);
+    frontendRedirectUrl.searchParams.append("refreshToken", refreshToken);
     frontendRedirectUrl.searchParams.append(
-      "message",
-      "Google OAuth processing backend."
+      "newAccount",
+      newAccount.toString()
     );
 
+    // for httpCookie
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: env.NODE_ENV === "production",
+      maxAge: env.JWT_REFRESH_EXPIRES_IN,
+      path: "/",
+    });
+
+    // frontendRedirectUrl.searchParams.append('accessToken', accessToken);
+
     res.redirect(frontendRedirectUrl.toString());
+    return;
   } catch (error) {
     logger.error(
       `Error during Google OAuth calllback processing. Query: ${JSON.stringify(
@@ -97,6 +120,16 @@ export const googleOAuthCallbackHandler = async (
       error
     );
 
-    next(error);
+    const frontendErrorRedirectUrl = new URL(env.FRONTEND_REDIRECT_URI);
+    frontendErrorRedirectUrl.searchParams.append("status", "error");
+    frontendErrorRedirectUrl.searchParams.append(
+      "message",
+      error instanceof Error
+        ? error.message
+        : "An unknown error occurred during Goolge login"
+    );
+
+    res.redirect(frontendErrorRedirectUrl.toString());
+    return;
   }
 };

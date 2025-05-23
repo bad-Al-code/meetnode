@@ -23,6 +23,9 @@ import {
 import { logger } from "../utils/logger";
 import { userInfo } from "node:os";
 import { StatusCodes } from "http-status-codes";
+import { googleOAuth2Client } from "../config/googleOAuthClient";
+import { gaxios } from "google-auth-library";
+import { googleOAuthCallbackHandler } from "../controllers/auth.controller";
 
 export const initiateEmailOtp = async (
   input: InitiateEmailOtpInput
@@ -194,4 +197,85 @@ export const refreshAccesstoken = async (
   const newAccessToken = signAccessToken(accessTokenPayload);
 
   return { accessToken: newAccessToken };
+};
+
+export const handleGoogleOAuthCallback = async (
+  code: string
+): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  newAccount: boolean;
+}> => {
+  try {
+    const { tokens } = await googleOAuth2Client.getToken(code);
+
+    if (!tokens.id_token) {
+      throw new AuthenticationError(
+        "Google Login Failed: Could not retieve user identity"
+      );
+    }
+
+    const ticket = await googleOAuth2Client.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: env.GOOGLE_CLIENT_ID,
+    });
+    const googlePayload = ticket.getPayload();
+
+    if (!googlePayload || !googlePayload.email || !googlePayload.sub) {
+      throw new AuthenticationError(
+        `Goolge Login Failed: Invlid user information`
+      );
+    }
+
+    const googleId = googlePayload.sub;
+    const email = googlePayload.email;
+    const name = googlePayload.name;
+    const picture = googlePayload.picture;
+
+    // map googleId to out internal `userId`
+    let internalUserId: string;
+    let newAccount = false;
+
+    const googleUserKey = `${env.GOOGLE_USER_ID_PREFIX}${googleId}`;
+    const storedInternalId = await redisClient.get(googleUserKey);
+
+    if (storedInternalId) {
+      internalUserId = storedInternalId;
+    } else {
+      internalUserId = `user_${randomBytes(8).toString("hex")}`;
+      await redisClient.set(googleUserKey, internalUserId);
+
+      newAccount = true;
+    }
+
+    const accessTokenPayload: Omit<AccessTokenPayload, "type"> = {
+      userId: internalUserId,
+      email,
+    };
+    const accessToken = signAccessToken(accessTokenPayload);
+    const refreshTokenId = randomBytes(16).toString("hex");
+    const refreshTokenPayload: Omit<RefreshTokenPayload, "type" | "tokenId"> & {
+      tokenId: string;
+    } = { userId: internalUserId, tokenId: refreshTokenId };
+    const refreshToken = signRefreshToken(refreshTokenPayload);
+    const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${internalUserId}`;
+
+    await redisClient.set(
+      refreshTokenKey,
+      "active",
+      "EX",
+      env.JWT_REFRESH_EXPIRES_IN
+    );
+
+    return { accessToken, refreshToken, newAccount };
+  } catch (error) {
+    if (error instanceof BaseError) {
+      throw error;
+    }
+
+    throw new AuthenticationError(
+      `Google login failed due to an internal error.`,
+      error instanceof Error ? error.message : String(error)
+    );
+  }
 };
