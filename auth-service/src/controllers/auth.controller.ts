@@ -8,6 +8,8 @@ import {
   VerifyEmailOtpInput,
 } from "../schemas/auth.schema";
 import { env } from "../config";
+import { AuthenticationError } from "../utils/errors";
+import { logger } from "../utils/logger";
 
 export const initiateEmailOtpHandler = async (
   req: Request<{}, {}, InitiateEmailOtpInput>,
@@ -58,6 +60,43 @@ export const refreshAccesstokenHandler = async (
     res.status(StatusCodes.OK).json(result);
     return;
   } catch (error) {
+    next(error);
+  }
+};
+
+export const googleOAuthCallbackHandler = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { code, scope } = req.query;
+    if (!code) {
+      next(
+        new AuthenticationError(
+          "Google OAuth failed: No authorization code received"
+        )
+      );
+      return;
+    }
+
+    const result = { message: "Google OAuth callback received. Processing..." };
+    const frontendRedirectUrl = new URL(env.FRONTEND_REDIRECT_URI);
+    frontendRedirectUrl.searchParams.append("status", "success");
+    frontendRedirectUrl.searchParams.append(
+      "message",
+      "Google OAuth processing backend."
+    );
+
+    res.redirect(frontendRedirectUrl.toString());
+  } catch (error) {
+    logger.error(
+      `Error during Google OAuth calllback processing. Query: ${JSON.stringify(
+        req.query
+      )}`,
+      error
+    );
+
     next(error);
   }
 };

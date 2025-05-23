@@ -7,6 +7,7 @@ import {
   verifyEmailOtpSchema,
 } from "../schemas/auth.schema";
 import {
+  googleOAuthCallbackHandler,
   initiateEmailOtpHandler,
   refreshAccesstokenHandler,
   verifyEmailOtpHandler,
@@ -31,5 +32,7 @@ router.post(
   validateRequest(refreshTokenSchema),
   refreshAccesstokenHandler
 );
+
+router.get("/google/callback", googleOAuthCallbackHandler);
 
 export { router as authRouter };
