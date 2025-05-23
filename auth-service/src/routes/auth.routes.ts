@@ -9,6 +9,7 @@ import {
 import {
   googleOAuthCallbackHandler,
   initiateEmailOtpHandler,
+  logoutHandler,
   refreshAccesstokenHandler,
   verifyEmailOtpHandler,
 } from "../controllers/auth.controller";
@@ -34,5 +35,7 @@ router.post(
 );
 
 router.get("/google/callback", googleOAuthCallbackHandler);
+
+router.post("/logout", validateRequest(refreshTokenSchema), logoutHandler);
 
 export { router as authRouter };

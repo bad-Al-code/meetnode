@@ -29,3 +29,4 @@ export const refreshTokenSchema = z.object({
 });
 
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>["body"];
+export type LogoutInput = RefreshTokenInput;

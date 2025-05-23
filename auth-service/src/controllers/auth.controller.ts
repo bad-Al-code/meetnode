@@ -4,6 +4,7 @@ import { StatusCodes } from "http-status-codes";
 import * as authService from "../services/auth.service";
 import {
   InitiateEmailOtpInput,
+  LogoutInput,
   RefreshTokenInput,
   VerifyEmailOtpInput,
 } from "../schemas/auth.schema";
@@ -131,5 +132,22 @@ export const googleOAuthCallbackHandler = async (
 
     res.redirect(frontendErrorRedirectUrl.toString());
     return;
+  }
+};
+
+export const logoutHandler = async (
+  req: Request<{}, {}, LogoutInput>,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { refreshToken } = req.body;
+
+    const result = await authService.logout({ refreshToken });
+
+    res.status(StatusCodes.OK).json(result);
+    return;
+  } catch (error) {
+    next(error);
   }
 };

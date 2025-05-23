@@ -3,6 +3,7 @@ import { env } from "../config";
 import { redisClient } from "../config/redisClient";
 import {
   InitiateEmailOtpInput,
+  LogoutInput,
   RefreshTokenInput,
   VerifyEmailOtpInput,
 } from "../schemas/auth.schema";
@@ -26,6 +27,7 @@ import { StatusCodes } from "http-status-codes";
 import { googleOAuth2Client } from "../config/googleOAuthClient";
 import { gaxios } from "google-auth-library";
 import { googleOAuthCallbackHandler } from "../controllers/auth.controller";
+import { decode } from "node:punycode";
 
 export const initiateEmailOtp = async (
   input: InitiateEmailOtpInput
@@ -278,4 +280,44 @@ export const handleGoogleOAuthCallback = async (
       error instanceof Error ? error.message : String(error)
     );
   }
+};
+
+export const logout = async (
+  input: LogoutInput
+): Promise<{ message: string }> => {
+  const { refreshToken: providedRefreshToken } = input;
+  const decodedPayload = verifyRefreshToken(providedRefreshToken);
+  if (!decodedPayload || !decodedPayload.userId || !decodedPayload.tokenId) {
+    throw new AuthenticationError(`Invalid refresh token`);
+  }
+
+  const { userId, tokenId } = decodedPayload;
+  const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${userId}:${tokenId}`;
+
+  try {
+    const deletedCount = await redisClient.del(refreshTokenKey);
+    if (deletedCount === 0) {
+      return { message: "Session already logged out or not found." };
+    }
+
+    return { message: "Logged out successfully." };
+  } catch (error) {
+    throw new BaseError(
+      `LogoutError`,
+      StatusCodes.INTERNAL_SERVER_ERROR,
+      "Failed to log out due to internal error"
+    );
+  }
+};
+
+export const revekeAllUserTokens = async (userId: string): Promise<number> => {
+  const keys = await redisClient.keys(
+    `${env.REFRESH_TOKEN_REDIS_PREFIX}${userId}:*`
+  );
+  if (keys.length > 0) {
+    const deletedCount = await redisClient.del(...keys);
+    return deletedCount;
+  }
+
+  return 0;
 };
