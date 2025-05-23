@@ -4,7 +4,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  PORT: z.coerce.number().positive().int().default(3000),
+  PORT: z.coerce.number().positive().int().default(3001),
 
   REDIS_HOST: z.string().default("localhost"),
   REDIS_PORT: z.coerce.number().positive().int().default(6379),

@@ -1,4 +1,6 @@
+import { StatusCodes } from "http-status-codes";
 import { randomBytes } from "node:crypto";
+
 import { env } from "../config";
 import { redisClient } from "../config/redisClient";
 import {
@@ -21,7 +23,6 @@ import {
   verifyRefreshToken,
 } from "../utils/jwt";
 import { logger } from "../utils/logger";
-import { StatusCodes } from "http-status-codes";
 import { googleOAuth2Client } from "../config/googleOAuthClient";
 import {
   GOOGLE_USER_ID_PREFIX,
@@ -29,6 +30,11 @@ import {
   OTP_VERIFY_ATTEMPTS_PREFIX,
   REFRESH_TOKEN_REDIS_PREFIX,
 } from "../constants/redis.constants";
+import { convertTimeStringToSeconds } from "../utils/time";
+
+const getRefreshExpiresInSeconds = (): number => {
+  return convertTimeStringToSeconds(env.JWT_EXPIRES_IN, 7 * 24 * 60 * 60);
+};
 
 export const initiateEmailOtp = async (
   input: InitiateEmailOtpInput
@@ -57,7 +63,7 @@ export const initiateEmailOtp = async (
   logger.info(`(Placeholder) Email would be sent to ${email} with OTP: ${otp}`);
 
   const response: { message: string; otp_for_testing?: string } = {
-    message: "OTP initiiation process started. Check your email.",
+    message: "OTP initiation process started. Check your email.",
   };
 
   if (env.NODE_ENV === "development") {
@@ -76,16 +82,6 @@ export const verifyEmailOtp = async (
 
   const storedOtp = await redisClient.get(otpKey);
 
-  if (!storedOtp) {
-    logger.warn(`OTP not found or expired for ${email}. Key: ${otpKey}`);
-
-    await redisClient.del(attemptsKey);
-
-    throw new NotFoundError(
-      `OTP not found or has expired. Please request a new OTP`
-    );
-  }
-
   const attemptsCountStr = await redisClient.get(attemptsKey);
   const attemptsCount = attemptsCountStr ? parseInt(attemptsCountStr, 10) : 0;
 
@@ -100,6 +96,16 @@ export const verifyEmailOtp = async (
     throw new BadRequestError(
       `Max verification attempts reached. Please request a new OTP.`,
       { attempts_count: attemptsCount + 1 }
+    );
+  }
+
+  if (!storedOtp) {
+    logger.warn(`OTP not found or expired for ${email}. Key: ${otpKey}`);
+
+    await redisClient.del(attemptsKey);
+
+    throw new NotFoundError(
+      `OTP not found or has expired. Please request a new OTP`
     );
   }
 
@@ -126,7 +132,6 @@ export const verifyEmailOtp = async (
 
   // TODO: check if user exists
   // TODO: if user does not exits, create them
-  // TODO: Generate JWT
   const simulateUserId = `user_${randomBytes(8).toString("hex")}`;
   const accessTokenPayload: Omit<AccessTokenPayload, "type"> = {
     userId: simulateUserId,
@@ -151,7 +156,7 @@ export const verifyEmailOtp = async (
       refreshTokenKey,
       "active",
       "EX",
-      env.JWT_REFRESH_EXPIRES_IN
+      getRefreshExpiresInSeconds()
     );
   } catch (error) {
     throw new BaseError(
@@ -213,6 +218,8 @@ export const handleGoogleOAuthCallback = async (
     const { tokens } = await googleOAuth2Client.getToken(code);
 
     if (!tokens.id_token) {
+      logger.error("Google token exchange failed: No ID token received.");
+
       throw new AuthenticationError(
         "Google Login Failed: Could not retieve user identity"
       );
@@ -232,10 +239,13 @@ export const handleGoogleOAuthCallback = async (
 
     const googleId = googlePayload.sub;
     const email = googlePayload.email;
-    const name = googlePayload.name;
-    const picture = googlePayload.picture;
+    const name = googlePayload.name || "";
+    const picture = googlePayload.picture || "";
 
-    // map googleId to out internal `userId`
+    logger.info(
+      `Google ID token verified for ${email}, Google ID: ${googleId}`
+    );
+
     let internalUserId: string;
     let newAccount = false;
 
@@ -244,11 +254,19 @@ export const handleGoogleOAuthCallback = async (
 
     if (storedInternalId) {
       internalUserId = storedInternalId;
+
+      logger.info(
+        `Existing user found for Google ID ${googleId}: internal ID ${internalUserId}`
+      );
     } else {
       internalUserId = `user_${randomBytes(8).toString("hex")}`;
       await redisClient.set(googleUserKey, internalUserId);
 
       newAccount = true;
+
+      logger.info(
+        `New user created for Google ID ${googleId}: internal ID: ${internalUserId}`
+      );
     }
 
     const accessTokenPayload: Omit<AccessTokenPayload, "type"> = {
@@ -261,17 +279,22 @@ export const handleGoogleOAuthCallback = async (
       tokenId: string;
     } = { userId: internalUserId, tokenId: refreshTokenId };
     const refreshToken = signRefreshToken(refreshTokenPayload);
-    const refreshTokenKey = `${REFRESH_TOKEN_REDIS_PREFIX}${internalUserId}`;
+    const refreshTokenKey = `${REFRESH_TOKEN_REDIS_PREFIX}${internalUserId}:${refreshTokenId}`;
 
     await redisClient.set(
       refreshTokenKey,
       "active",
       "EX",
-      env.JWT_REFRESH_EXPIRES_IN
+      getRefreshExpiresInSeconds()
     );
 
     return { accessToken, refreshToken, newAccount };
   } catch (error) {
+    logger.error(
+      `Error during Google OAuth token echange or ID token verification: `,
+      error
+    );
+
     if (error instanceof BaseError) {
       throw error;
     }
@@ -298,6 +321,10 @@ export const logout = async (
   try {
     const deletedCount = await redisClient.del(refreshTokenKey);
     if (deletedCount === 0) {
+      logger.warn(
+        `Logout: Refresh token for user ${userId}, tokenId ${tokenId} not found in Redis or already revoked.`
+      );
+
       return { message: "Session already logged out or not found." };
     }
 
@@ -311,14 +338,18 @@ export const logout = async (
   }
 };
 
-export const revekeAllUserTokens = async (userId: string): Promise<number> => {
+export const revokeAllUserTokens = async (userId: string): Promise<number> => {
+  logger.info(`Revoking all refresh tokens for user: ${userId}`);
   const keys = await redisClient.keys(
     `${REFRESH_TOKEN_REDIS_PREFIX}${userId}:*`
   );
   if (keys.length > 0) {
     const deletedCount = await redisClient.del(...keys);
+    logger.info(`Revoked ${deletedCount} refresh token for user ${userId}`);
+
     return deletedCount;
   }
 
+  logger.info(`No refresh token found to revoke for user ${userId}`);
   return 0;
 };
