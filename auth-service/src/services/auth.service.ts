@@ -18,24 +18,25 @@ import {
   RefreshTokenPayload,
   signAccessToken,
   signRefreshToken,
-  verifyAccessToken,
   verifyRefreshToken,
 } from "../utils/jwt";
 import { logger } from "../utils/logger";
-import { userInfo } from "node:os";
 import { StatusCodes } from "http-status-codes";
 import { googleOAuth2Client } from "../config/googleOAuthClient";
-import { gaxios } from "google-auth-library";
-import { googleOAuthCallbackHandler } from "../controllers/auth.controller";
-import { decode } from "node:punycode";
+import {
+  GOOGLE_USER_ID_PREFIX,
+  OTP_REDIS_PREFIX,
+  OTP_VERIFY_ATTEMPTS_PREFIX,
+  REFRESH_TOKEN_REDIS_PREFIX,
+} from "../constants/redis.constants";
 
 export const initiateEmailOtp = async (
   input: InitiateEmailOtpInput
 ): Promise<{ message: string; otp_for_testing?: string }> => {
   const { email } = input;
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const otpKey = `${env.OTP_REDIS_PREFIX}${email}`;
-  const attemptsKey = `${env.OTP_VERIFY_ATTEMPTS_PREFIX}${email}`;
+  const otpKey = `${OTP_REDIS_PREFIX}${email}`;
+  const attemptsKey = `${OTP_VERIFY_ATTEMPTS_PREFIX}${email}`;
 
   try {
     const pipeline = redisClient.pipeline();
@@ -70,8 +71,8 @@ export const verifyEmailOtp = async (
   input: VerifyEmailOtpInput
 ): Promise<{ message: string; accessToken: string; refreshToken: string }> => {
   const { email, otp: providedOtp } = input;
-  const otpKey = `${env.OTP_REDIS_PREFIX}${email}`;
-  const attemptsKey = `${env.OTP_VERIFY_ATTEMPTS_PREFIX}${email}`;
+  const otpKey = `${OTP_REDIS_PREFIX}${email}`;
+  const attemptsKey = `${OTP_VERIFY_ATTEMPTS_PREFIX}${email}`;
 
   const storedOtp = await redisClient.get(otpKey);
 
@@ -143,7 +144,7 @@ export const verifyEmailOtp = async (
 
   const refreshToken = signRefreshToken(refreshTokenPayload);
 
-  const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${simulateUserId}:${refreshTokenId}`;
+  const refreshTokenKey = `${REFRESH_TOKEN_REDIS_PREFIX}${simulateUserId}:${refreshTokenId}`;
 
   try {
     await redisClient.set(
@@ -178,7 +179,7 @@ export const refreshAccesstoken = async (
   }
 
   const { userId, tokenId } = decodedPayload;
-  const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${userId}:${tokenId}`;
+  const refreshTokenKey = `${REFRESH_TOKEN_REDIS_PREFIX}${userId}:${tokenId}`;
   const storedTokenState = await redisClient.get(refreshTokenKey);
 
   if (!storedTokenState || storedTokenState !== "active") {
@@ -238,7 +239,7 @@ export const handleGoogleOAuthCallback = async (
     let internalUserId: string;
     let newAccount = false;
 
-    const googleUserKey = `${env.GOOGLE_USER_ID_PREFIX}${googleId}`;
+    const googleUserKey = `${GOOGLE_USER_ID_PREFIX}${googleId}`;
     const storedInternalId = await redisClient.get(googleUserKey);
 
     if (storedInternalId) {
@@ -260,7 +261,7 @@ export const handleGoogleOAuthCallback = async (
       tokenId: string;
     } = { userId: internalUserId, tokenId: refreshTokenId };
     const refreshToken = signRefreshToken(refreshTokenPayload);
-    const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${internalUserId}`;
+    const refreshTokenKey = `${REFRESH_TOKEN_REDIS_PREFIX}${internalUserId}`;
 
     await redisClient.set(
       refreshTokenKey,
@@ -292,7 +293,7 @@ export const logout = async (
   }
 
   const { userId, tokenId } = decodedPayload;
-  const refreshTokenKey = `${env.REFRESH_TOKEN_REDIS_PREFIX}${userId}:${tokenId}`;
+  const refreshTokenKey = `${REFRESH_TOKEN_REDIS_PREFIX}${userId}:${tokenId}`;
 
   try {
     const deletedCount = await redisClient.del(refreshTokenKey);
@@ -312,7 +313,7 @@ export const logout = async (
 
 export const revekeAllUserTokens = async (userId: string): Promise<number> => {
   const keys = await redisClient.keys(
-    `${env.REFRESH_TOKEN_REDIS_PREFIX}${userId}:*`
+    `${REFRESH_TOKEN_REDIS_PREFIX}${userId}:*`
   );
   if (keys.length > 0) {
     const deletedCount = await redisClient.del(...keys);

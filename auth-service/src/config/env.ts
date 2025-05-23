@@ -10,18 +10,6 @@ const envSchema = z.object({
   REDIS_PORT: z.coerce.number().positive().int().default(6379),
   REDIS_PASSWORD: z.string().optional(),
   REDIS_DB: z.coerce.number().int().default(0),
-  OTP_REDIS_PREFIX: z
-    .string()
-    .min(1, { message: "OTP_REDIS_PREFIX is required" }),
-  OTP_VERIFY_ATTEMPTS_PREFIX: z
-    .string()
-    .min(1, { message: "OTP_VERIFY_ATTEMPTS_PREFIX is required" }),
-  REFRESH_TOKEN_REDIS_PREFIX: z
-    .string()
-    .min(1, { message: "REFRESH_TOKEN_REDIS_PREFIX is required" }),
-  GOOGLE_USER_ID_PREFIX: z
-    .string()
-    .min(1, { message: "GOOGLE_USER_ID_PREFIX s=is required" }),
 
   OTP_EXPIRY_SECONDS: z.coerce.number().positive().int().default(300),
   OTP_MAX_VERIFY_ATTEMPTS: z.coerce.number().positive().int().default(5),
@@ -29,11 +17,11 @@ const envSchema = z.object({
   JWT_SECRET: z
     .string()
     .min(32, { message: "JWT_SECRET must be at least 32 characters long" }),
-  JWT_EXPIRES_IN: z.coerce.number().positive().int().default(3600),
+  JWT_EXPIRES_IN: z.string().default("1h"),
   JWT_REFRESH_SECRET: z
     .string()
     .min(32, { message: "JWT_SECRET must be at least 32 characters long" }),
-  JWT_REFRESH_EXPIRES_IN: z.coerce.number().positive().int().default(3600),
+  JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
 
   GOOGLE_CLIENT_ID: z
     .string()
